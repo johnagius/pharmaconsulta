@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PharmaConsulta Batch Upload</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2338bdf8'/%3E%3Ctext x='8' y='12' text-anchor='middle' font-size='10' font-family='sans-serif' fill='%230b1224' font-weight='700'%3EPC%3C/text%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #0f172a;
+  --panel: #111c34;
+  --panel-2: #16224a;
+  --accent: #38bdf8;
+  --accent-2: #22d3ee;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --ok: #4ade80;
+  --warn: #fbbf24;
+  --err: #f87171;
+  --border: #1e293b;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: linear-gradient(180deg, #0b1224, #0f172a 30%, #0b1224);
+  color: var(--text);
+  font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  min-height: 100vh;
+}
+header {
+  padding: 24px 32px 12px;
+  border-bottom: 1px solid var(--border);
+}
+header h1 {
+  margin: 0 0 4px;
+  font-size: 22px;
+  letter-spacing: 0.2px;
+}
+header p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+main {
+  padding: 24px 32px 48px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+#drop-zone {
+  border: 2px dashed #334155;
+  border-radius: 12px;
+  padding: 36px;
+  text-align: center;
+  background: var(--panel);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+#drop-zone.dragover {
+  border-color: var(--accent);
+  background: var(--panel-2);
+}
+#drop-zone strong { color: var(--accent); }
+#drop-zone small { display: block; color: var(--muted); margin-top: 6px; font-size: 12px; }
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+button {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+button:hover { background: #1f2b58; }
+button.primary {
+  background: var(--accent);
+  color: #0b1224;
+  border-color: transparent;
+  font-weight: 600;
+}
+button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+button.danger { color: var(--err); }
+#status { font-size: 12px; color: var(--muted); margin: 8px 0; min-height: 18px; }
+.status-line.err { color: var(--err); }
+.status-line.warn { color: var(--warn); }
+.status-line.ok { color: var(--ok); }
+#preview-wrapper {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  max-height: 60vh;
+}
+table {
+  border-collapse: collapse;
+  font-size: 12px;
+  width: max-content;
+}
+thead th {
+  background: #1f2b58;
+  position: sticky;
+  top: 0;
+  padding: 6px 8px;
+  text-align: left;
+  font-weight: 600;
+  border-bottom: 1px solid #334155;
+  white-space: nowrap;
+}
+tbody td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+tbody tr.invalid { background: rgba(248, 113, 113, 0.08); }
+tbody td[contenteditable="true"]:focus {
+  outline: 2px solid var(--accent);
+  background: #1f2b58;
+}
+td.col-product select {
+  background: #0b1224;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12px;
+  padding: 2px 6px;
+  max-width: 200px;
+}
+td.col-file { color: var(--muted); }
+.badge {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #334155;
+  font-size: 10px;
+  margin-right: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.badge.ok { background: rgba(74, 222, 128, 0.2); color: var(--ok); }
+.badge.warn { background: rgba(251, 191, 36, 0.2); color: var(--warn); }
+.badge.err { background: rgba(248, 113, 113, 0.2); color: var(--err); }
+footer {
+  padding: 16px 32px;
+  color: var(--muted);
+  font-size: 11px;
+  border-top: 1px solid var(--border);
+}
+.row-summary {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.row-summary strong { color: var(--text); }
+.hidden { display: none !important; }
+
+</style>
+</head>
+<body>
+<header>
+  <h1>PharmaConsulta &mdash; FedEx Batch Builder</h1>
+  <p>Drop PDF orders (single files or whole folders). Review the table, pick products where needed, then download the FedEx batch xlsx.</p>
+</header>
+<main>
+  <div id="drop-zone" tabindex="0" role="button" aria-label="Upload PDF files">
+    <strong>Drop PDFs or folders here</strong>
+    <small>&hellip; or click to pick files</small>
+    <input type="file" id="file-picker" accept="application/pdf" multiple class="hidden">
+    <input type="file" id="folder-picker" webkitdirectory directory multiple class="hidden">
+  </div>
+  <div class="actions">
+    <button id="btn-add-folder" type="button">Add folder</button>
+    <button id="btn-clear" class="danger" type="button">Clear</button>
+    <button id="btn-download" class="primary" type="button" disabled>Download xlsx</button>
+  </div>
+  <div class="row-summary" id="summary">Drop PDFs above to begin.</div>
+  <div id="status" aria-live="polite"></div>
+  <div id="preview-wrapper">
+    <table aria-label="Shipments preview">
+      <thead id="table-head"></thead>
+      <tbody id="table-body"></tbody>
+    </table>
+  </div>
+</main>
+<footer>
+  PharmaConsulta &middot; runs entirely in your browser. No data leaves your machine.
+</footer>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
+<script>
+(function () {
+  if (window.pdfjsLib) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+  }
+})();
+</script>
+<script>
+// === data/columns.js ===
+const ModColumns = (function () {
+const COLUMN_KEYS = [
+  'serviceType',
+  'shipmentType',
+  'senderContactName',
+  'senderCompany',
+  'senderContactNumber',
+  'senderEmail',
+  'senderLine1',
+  'senderLine2',
+  'senderPostcode',
+  'senderState',
+  'senderCity',
+  'senderCountry',
+  'recipientContactName',
+  'recipientCompany',
+  'recipientContactNumber',
+  'recipientEmail',
+  'recipientLine1',
+  'recipientLine2',
+  'recipientLine3',
+  'recipientPostcode',
+  'recipientState',
+  'recipientCity',
+  'recipientCountry',
+  'packageType',
+  'numberOfPackages',
+  'packageWeight',
+  'weightUnits',
+  'length',
+  'width',
+  'height',
+  'currencyType',
+  'oneRatePricing',
+  'commodityType',
+  'itemDescription',
+  'harmonizedCode',
+  'manufacturingCountry',
+  'commodityQuantity',
+  'commodityMeasureUnit',
+  'commodityWeight',
+  'customsValue',
+  'documentType',
+  'documentDescription',
+  'purposeOfShipment',
+  'etdEnabled',
+  'TermsOfSale',
+  'DeclarationStatement',
+  'ciCommentLine',
+  'generateInvoice',
+  'PickupType',
+  'paymentType',
+  'taxPaymentType',
+  'serviceType',
+];
+
+const ROW_CONSTANTS = {
+  serviceType: 'FEDEX_INTERNATIONAL_PRIORITY',
+  shipmentType: 'OUTBOUND',
+  senderCompany: '',
+  senderContactNumber: '99355659',
+  senderEmail: 'rel_warehouse@proton.me',
+  senderLine2: '',
+  senderState: '',
+  senderCountry: 'MT',
+  recipientCompany: '',
+  recipientLine2: '',
+  recipientLine3: '',
+  recipientCountry: 'US',
+  packageType: 'FEDEX_PAK',
+  numberOfPackages: '1',
+  packageWeight: '1.8',
+  weightUnits: 'KGS',
+  length: '',
+  width: '',
+  height: '',
+  currencyType: 'USD',
+  oneRatePricing: '',
+  commodityType: 'ITEMS',
+  commodityQuantity: '1',
+  commodityMeasureUnit: 'PCS',
+  commodityWeight: '1.8',
+  customsValue: '150',
+  documentType: '',
+  documentDescription: '',
+  purposeOfShipment: 'SAMPLE',
+  etdEnabled: 'Y',
+  TermsOfSale: '',
+  DeclarationStatement: 'PERSONAL NOT FOR RESALE',
+  generateInvoice: 'CI',
+  PickupType: 'DROP_BOX',
+  paymentType: 'Sender',
+  taxPaymentType: 'Sender',
+};
+
+  return { COLUMN_KEYS, ROW_CONSTANTS };
+})();
+
+// === data/senders.js ===
+const ModSenders = (function () {
+const SENDERS = [
+  { name: 'Robert Aquilina', line1: '41 Triq Il Kbira', postcode: 'BKR1012', city: 'Birkirkara' },
+  { name: 'Sandra Borg', line1: '42 Triq San Pawl', postcode: 'MST2141', city: 'Mosta' },
+  { name: 'Frank Zammit', line1: '43 Triq Il Bahar', postcode: 'RBT1124', city: 'Rabat' },
+  { name: 'Maria Galea', line1: '44 Triq Il Ward', postcode: 'SPB3413', city: 'Saint Pauls Bay' },
+  { name: 'Paul Pace', line1: '45 Triq Il Knisja', postcode: 'QRM2051', city: 'Qormi' },
+  { name: 'Sandra Caruana', line1: '46 Triq San Gorg', postcode: 'ZBG1343', city: 'Zebbug' },
+  { name: 'James Briffa', line1: '47 Triq Dun Karm', postcode: 'VCT1022', city: 'Victoria' },
+  { name: 'Mary Fenech', line1: '48 Triq Il Mithna', postcode: 'SLM1603', city: 'Sliema' },
+];
+
+  return { SENDERS };
+})();
+
+// === data/hsCodes.js ===
+const ModHs = (function () {
+const HS_CODES = [
+  { description: 'Advanced formulation designed to improve overall wellbeing to a healthy appearance in aesthetic applications', code: '4901990070' },
+  { description: 'Advanced formulation designed to improve overall wellbeing and facial areas. Not tested on animals. Paraben-free. Used for skin hydrating purposes', code: '3304991000' },
+  { description: 'Glow facial moisturizer, non-animal origin, non-colorant, personal & single use only, EN packaging', code: '3304991000' },
+  { description: 'Advanced formulation designed to improve overall wellbeing and facial areas. Not tested on animals. Paraben-free. Used for skin hydrating purposes', code: '3304910010' },
+  { description: 'All about that base makeup prep squad life-proof primer, non-animal origin, non-colorant, personal & single use only, EN packaging', code: '3304991000' },
+  { description: 'Lash & brow volumizing serum, non-animal origin, non-colorant, personal & single use only, EN packaging', code: '3304200000' },
+  { description: 'Generation happy skin on-the-go blush longwear cream blush, non-animal origin, non-colorant, personal & single use only, EN packaging', code: '3304991000' },
+  { description: 'Cosmetics intense cover concealer, non-animal origin, non-colorant, personal & single use only, EN packaging', code: '3304991000' },
+  { description: 'Facial powder for complexion finish, non-animal origin, non-colorant, personal & single use only, EN packaging', code: '3304910010' },
+  { description: 'Moisturising lip balm with natural ingredients, non-colorant, non-animal origin, personal & single use only, EN packaging', code: '3304100000' },
+  { description: 'Bodyography blurset perfect loose finishing powder, non-animal origin, non-colorant, personal & single use only, EN packaging', code: '3304910010' },
+  { description: 'Cosmetics second base everyday concealer, non-animal origin, non-colorant, personal & single use only, EN packaging', code: '3304991000' },
+  { description: 'Intense hydrating facial moisturizer cream, non-animal origin, non-colorant, personal & single use only, EN packaging', code: '3304991000' },
+];
+
+  return { HS_CODES };
+})();
+
+// === data/midCodes.js ===
+const ModMid = (function () {
+const PRODUCTS = [
+  { key: 'ozempic', label: 'Ozempic', mid: 'DKNOVNORBAG', country: 'DK', patterns: [/ozempic/i] },
+  { key: 'wegovy', label: 'Wegovy', mid: 'DKNOVNORBAG', country: 'DK', patterns: [/wegovy/i] },
+  { key: 'norditropin', label: 'Norditropin', mid: 'DKNOVNOR1BAG', country: 'DK', patterns: [/norditropin/i] },
+  { key: 'botox', label: 'Botox', mid: 'IEALLPHAWE', country: 'IE', patterns: [/botox/i, /\bBOT\s+\d+IU\b/i] },
+  { key: 'xeomin', label: 'Xeomin', mid: 'DEMERPHA100FRA', country: 'DE', patterns: [/xeomin/i] },
+  { key: 'azzalure', label: 'Azzalure', mid: 'GBIPSBIOWRE', country: 'GB', patterns: [/azzalure/i] },
+  { key: 'dysport', label: 'Dysport', mid: 'GBIPS37LON', country: 'GB', patterns: [/dysport/i] },
+  { key: 'emla', label: 'Emla', mid: 'IEASPPHA3016DUB', country: 'IE', patterns: [/\bemla\b/i] },
+  { key: 'bocouture', label: 'Bocouture 50', mid: 'DEMERPHA100FRA', country: 'DE', patterns: [/bocouture/i] },
+  { key: 'smb', label: 'SMB', mid: 'GBRFMED17STH', country: 'GB', patterns: [/\bSMB\b/] },
+  { key: 'nexplanon', label: 'Nexplanon', mid: 'GBORGPHACRA', country: 'GB', patterns: [/nexplanon/i] },
+  { key: 'gardasil', label: 'Gardasil', mid: 'NLMERSHA39HAA', country: 'NL', patterns: [/gardasil/i] },
+  { key: 'vabysmo', label: 'Vabysmo', mid: 'ATROCREG1VIE', country: 'AT', patterns: [/vabysmo/i] },
+  { key: 'synvisc', label: 'Synvisc Hylan', mid: 'NLGENEUR25AMS', country: 'NL', patterns: [/synvisc/i] },
+  { key: 'bcn', label: 'BCN', mid: 'ESINSBCN2BAR', country: 'ES', patterns: [/\bBCN\b/] },
+  { key: 'profhilo', label: 'Profhilo', mid: 'ITISSFAR2LOD', country: 'IT', patterns: [/profhilo/i] },
+  { key: 'restylane', label: 'Restylane (all)', mid: 'SEQ-M21UPP', country: 'SE', patterns: [/restylane/i] },
+  { key: 'juvederm', label: 'Juvederm (all)', mid: 'FRALLROUPROPRI', country: 'FR', patterns: [/juvederm/i] },
+  { key: 'jardiance', label: 'Jardiance', mid: 'DEBOEING173ING', country: 'DE', patterns: [/jardiance/i] },
+  { key: 'prolia', label: 'Prolia', mid: 'PRAMGMAN31JUN', country: 'PR', patterns: [/prolia/i] },
+  { key: 'stylage', label: 'Stylage', mid: 'FRLABVIV44PAR', country: 'FR', patterns: [/stylage/i] },
+  { key: 'radiesse', label: 'Radiesse', mid: 'DEMERAES100FRA', country: 'DE', patterns: [/radiesse/i] },
+  { key: 'lumigan', label: 'Lumigan', mid: 'GBABBVIEMAI', country: 'GB', patterns: [/lumigan/i] },
+  { key: 'prxt33', label: 'PRX-T33', mid: 'ITVIAMAR16MUG', country: 'IT', patterns: [/prx[\s-]?t33/i] },
+  { key: 'saypha', label: 'Saypha', mid: 'ATCROPHA6LEO', country: 'AT', patterns: [/saypha/i] },
+  { key: 'fillmed', label: 'Fillmed', mid: 'FRLABFIL38PAR', country: 'FR', patterns: [/fillmed/i] },
+  { key: 'sunekos', label: 'Sunekos', mid: 'ITPRODIE1MIL', country: 'IT', patterns: [/sunekos/i] },
+  { key: 'letybo', label: 'Letybo', mid: 'ATCROPHA6LEO', country: 'AT', patterns: [/letybo/i] },
+  { key: 'teosyal', label: 'Teosyal', mid: 'CHTEOSA105GE', country: 'CH', patterns: [/teosyal/i] },
+  { key: 'orencia', label: 'Orencia', mid: 'IEBRIMYESQU254DUB', country: 'IE', patterns: [/orencia/i, /abatacept/i] },
+  { key: 'crysvita', label: 'Crysvita', mid: 'NLKYOKIR2HOO', country: 'NL', patterns: [/crysvita/i, /burosumab/i] },
+  { key: 'hemlibra', label: 'Hemlibra', mid: 'DEROC1GRE', country: 'DE', patterns: [/hemlibra/i, /emicizumab/i] },
+  { key: 'alecensa', label: 'Alecensa', mid: 'CHROC124BAS', country: 'CH', patterns: [/alecensa/i, /alectinib/i] },
+  { key: 'mounjaro', label: 'Mounjaro', mid: 'CHELILIL16GEN', country: 'CH', patterns: [/mounjaro/i, /tirzepatide/i] },
+  { key: 'takhzyro', label: 'Takhzyro', mid: 'IETAKPHA5058DUB', country: 'IE', patterns: [/takhzyro/i] },
+  { key: 'verzenios', label: 'Verzenios', mid: 'CHELILIL16GEN', country: 'CH', patterns: [/verzenios/i, /abemaciclib/i] },
+  { key: 'osimertinib', label: 'Osimertinib', mid: '', country: '', patterns: [/osimertinib/i, /tagrisso/i] },
+  { key: 'meriofert', label: 'Meriofert', mid: '', country: '', patterns: [/meriofert/i] },
+  { key: 'lucrin', label: 'Lucrin Depot', mid: '', country: '', patterns: [/lucrin/i] },
+];
+
+function detectProduct(text) {
+  if (!text) return null;
+  for (const product of PRODUCTS) {
+    for (const pattern of product.patterns) {
+      if (pattern.test(text)) return product;
+    }
+  }
+  return null;
+}
+
+function findProductByKey(key) {
+  return PRODUCTS.find((p) => p.key === key) || null;
+}
+
+function ciCommentForProduct(product) {
+  if (!product || !product.mid) return '';
+  return `MID: ${product.mid}`;
+}
+
+  return { detectProduct, findProductByKey, ciCommentForProduct, PRODUCTS };
+})();
+
+// === buildRow.js ===
+const ModBuildRow = (function () {
+const COLUMN_KEYS = ModColumns.COLUMN_KEYS;
+const ROW_CONSTANTS = ModColumns.ROW_CONSTANTS;
+const SENDERS = ModSenders.SENDERS;
+const HS_CODES = ModHs.HS_CODES;
+const ciCommentForProduct = ModMid.ciCommentForProduct;
+
+function buildRow({ recipient, product }, rowIndex) {
+  const sender = SENDERS[rowIndex % SENDERS.length];
+  const hs = HS_CODES[rowIndex % HS_CODES.length];
+
+  const row = {
+    ...ROW_CONSTANTS,
+    senderContactName: sender.name,
+    senderLine1: sender.line1,
+    senderPostcode: sender.postcode,
+    senderCity: sender.city,
+    recipientContactName: recipient?.name || '',
+    recipientContactNumber: recipient?.phone || '',
+    recipientEmail: recipient?.email || '',
+    recipientLine1: recipient?.line1 || '',
+    recipientPostcode: recipient?.postcode || '',
+    recipientState: recipient?.state || '',
+    recipientCity: recipient?.city || '',
+    itemDescription: hs.description,
+    harmonizedCode: hs.code,
+    manufacturingCountry: product?.country || '',
+    ciCommentLine: ciCommentForProduct(product),
+  };
+
+  return COLUMN_KEYS.map((key, idx) => {
+    if (idx === COLUMN_KEYS.length - 1) return row.serviceType;
+    return row[key] ?? '';
+  });
+}
+
+function HEADER_ROW() {
+  return COLUMN_KEYS.slice();
+}
+
+  return { buildRow, HEADER_ROW };
+})();
+
+// === excelExporter.js ===
+const ModExporter = (function () {
+const HEADER_ROW = ModBuildRow.HEADER_ROW;
+const buildRow = ModBuildRow.buildRow;
+
+const COL_WIDTH = 28.875;
+
+function buildAOA(orders) {
+  const aoa = [HEADER_ROW()];
+  orders.forEach((order, i) => {
+    aoa.push(buildRow(order, i));
+  });
+  return aoa;
+}
+
+function buildWorkbook(orders, XLSX) {
+  const aoa = buildAOA(orders);
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = aoa[0].map(() => ({ wch: COL_WIDTH }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  return wb;
+}
+
+function exportToBlob(orders, XLSX) {
+  const wb = buildWorkbook(orders, XLSX);
+  const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  return new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+}
+
+function buildFileName(count, date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `FedEx_Batch_${y}-${m}-${d}_${count}shipments.xlsx`;
+}
+
+  return { buildAOA, buildWorkbook, exportToBlob, buildFileName };
+})();
+
+// === pdfReader.js ===
+const ModPdfReader = (function () {
+async function readPdfText(file, pdfjsLib) {
+  const buf = await file.arrayBuffer();
+  const loadingTask = pdfjsLib.getDocument({ data: buf });
+  const pdf = await loadingTask.promise;
+  const pages = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    pages.push(renderPage(content));
+  }
+  return pages.join('\n');
+}
+
+function renderPage(content) {
+  const lines = new Map();
+  for (const item of content.items) {
+    if (!item.str) continue;
+    const y = Math.round(item.transform[5]);
+    const x = item.transform[4];
+    const w = item.width || 0;
+    const entry = lines.get(y) || [];
+    entry.push({ x, w, str: item.str, hasEOL: item.hasEOL });
+    lines.set(y, entry);
+  }
+  const keys = Array.from(lines.keys()).sort((a, b) => b - a);
+  const rows = keys.map((y) => {
+    const items = lines.get(y).sort((a, b) => a.x - b.x);
+    let line = '';
+    let prevEnd = null;
+    let avgCharWidth = 5;
+    for (const it of items) {
+      if (it.w && it.str.length) {
+        avgCharWidth = Math.max(2, it.w / it.str.length);
+      }
+      if (prevEnd !== null) {
+        const gap = it.x - prevEnd;
+        if (gap > avgCharWidth * 0.6) {
+          const spaces = Math.max(1, Math.min(20, Math.round(gap / avgCharWidth)));
+          line += ' '.repeat(spaces);
+        }
+      }
+      line += it.str;
+      prevEnd = it.x + (it.w || it.str.length * avgCharWidth);
+    }
+    return line.replace(/[ \t]+/g, ' ').trim();
+  });
+  return rows.filter((l) => l.length).join('\n');
+}
+
+  return { readPdfText };
+})();
+
+// === parsers/activa.js ===
+const ParserActiva = (function () {
+const STATE_ABBR = {
+  alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA',
+  colorado: 'CO', connecticut: 'CT', delaware: 'DE', florida: 'FL', georgia: 'GA',
+  hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA',
+  kansas: 'KS', kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD',
+  massachusetts: 'MA', michigan: 'MI', minnesota: 'MN', mississippi: 'MS',
+  missouri: 'MO', montana: 'MT', nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH',
+  'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC',
+  'north dakota': 'ND', ohio: 'OH', oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA',
+  'rhode island': 'RI', 'south carolina': 'SC', 'south dakota': 'SD', tennessee: 'TN',
+  texas: 'TX', utah: 'UT', vermont: 'VT', virginia: 'VA', washington: 'WA',
+  'west virginia': 'WV', wisconsin: 'WI', wyoming: 'WY',
+  'district of columbia': 'DC', 'puerto rico': 'PR',
+};
+
+function abbr(name) {
+  const key = String(name || '').trim().toLowerCase();
+  return STATE_ABBR[key] || name.trim().toUpperCase();
+}
+
+function detect(text) {
+  return /A-Stock\b/i.test(text) && /Shipping Address:/i.test(text);
+}
+
+function parse(text) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim());
+  const start = lines.findIndex((l) => /^Shipping Address:/i.test(l));
+  if (start === -1) return null;
+
+  const block = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) continue;
+    if (/^Products Ordered:/i.test(line) || /^\*{5,}/.test(line)) break;
+    block.push(line);
+  }
+
+  let name = '';
+  let line1 = '';
+  let line2 = '';
+  let city = '';
+  let state = '';
+  let zip = '';
+  let phone = '';
+  let buf = [];
+
+  for (const raw of block) {
+    if (/^United States$/i.test(raw)) continue;
+    if (/^T:/i.test(raw)) {
+      phone = raw.replace(/^T:\s*/i, '').replace(/[^0-9+]/g, '');
+      continue;
+    }
+    if (/^\(?\+?\d[\d\s\-().]{7,}$/.test(raw)) {
+      phone = raw.replace(/[^0-9+]/g, '');
+      continue;
+    }
+    const cityStateZip = raw.match(/^([^,]+),\s*([^,]+),\s*([0-9]{5}(?:-[0-9]{4})?)$/);
+    if (cityStateZip) {
+      city = cityStateZip[1].trim();
+      state = abbr(cityStateZip[2]);
+      zip = cityStateZip[3];
+      continue;
+    }
+    buf.push(raw);
+  }
+
+  if (buf.length) name = buf.shift();
+  if (buf.length) line1 = buf.shift();
+  if (buf.length) line2 = buf.shift();
+
+  const productsIdx = lines.findIndex((l) => /^Products Ordered:/i.test(l));
+  const productLine = productsIdx >= 0
+    ? (lines.slice(productsIdx + 1).find((l) => l && !/^\*{5,}/.test(l)) || '')
+    : '';
+
+  return {
+    source: 'activa',
+    orderId: '',
+    recipient: {
+      name,
+      line1,
+      line2,
+      city,
+      state,
+      postcode: zip,
+      country: 'US',
+      phone,
+      email: '',
+    },
+    productText: productLine,
+    rawText: text,
+  };
+}
+
+  return { detect, parse };
+})();
+
+// === parsers/dh.js ===
+const ParserDh = (function () {
+const CITY_STATE_ZIP = /^([^,]+),\s*([A-Z]{2})\s+([0-9]{5}(?:-[0-9]{4})?)\s*$/;
+
+function normalize(text) {
+  return text.replace(/ﬀ|ﬁ|ﬂ|ﬃ|ﬄ|�/g, (ch) => {
+    const map = { 'ﬀ': 'ff', 'ﬁ': 'fi', 'ﬂ': 'fl', 'ﬃ': 'ffi', 'ﬄ': 'ffl' };
+    return map[ch] || ch;
+  });
+}
+
+function detect(text) {
+  return /OrderID:\s*\d+/i.test(text) && /Shipping Address/i.test(text);
+}
+
+function parse(text) {
+  const t = normalize(text);
+  const idMatch = t.match(/OrderID:\s*(\d+)/i);
+  const orderId = idMatch ? idMatch[1] : '';
+
+  const lines = t.split(/\r?\n/).map((l) => l.trim());
+  const start = lines.findIndex((l) => /^Shipping Address/i.test(l));
+  if (start === -1) return null;
+
+  const block = [];
+  for (let i = start + 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) continue;
+    if (/^Products?\b/i.test(line)) break;
+    block.push(line);
+  }
+
+  let name = '';
+  let line1 = '';
+  let city = '';
+  let state = '';
+  let zip = '';
+  let phone = '';
+  let email = '';
+  const country = 'US';
+
+  for (const raw of block) {
+    if (/^USA$|^United States$/i.test(raw)) continue;
+    if (/^Phone:/i.test(raw)) {
+      phone = raw.replace(/^Phone:\s*/i, '').replace(/[^0-9+]/g, '');
+      continue;
+    }
+    if (/^Email:/i.test(raw)) {
+      email = raw.replace(/^Email:\s*/i, '').trim();
+      continue;
+    }
+    const m = raw.match(CITY_STATE_ZIP);
+    if (m) {
+      city = m[1].trim();
+      state = m[2];
+      zip = m[3];
+      continue;
+    }
+    if (!name) {
+      name = raw;
+    } else if (!line1) {
+      line1 = raw;
+    }
+  }
+
+  const productLine = lines
+    .slice(lines.findIndex((l) => /^Products?\b/i.test(l)) + 1)
+    .find((l) => l && !/^Product Name/i.test(l) && !/^Generated:/i.test(l));
+  const productText = productLine ? productLine.replace(/\s{2,}\d+\s*$/, '').trim() : '';
+
+  return {
+    source: 'dh',
+    orderId,
+    recipient: {
+      name,
+      line1,
+      city,
+      state,
+      postcode: zip,
+      country,
+      phone,
+      email,
+    },
+    productText,
+    rawText: t,
+  };
+}
+
+  return { detect, parse };
+})();
+
+// === parsers/k2.js ===
+const ParserK2 = (function () {
+function detect(text) {
+  return /ORDER\s*#\s*\d+/i.test(text) && /Shipping Address/i.test(text);
+}
+
+function cleanPhone(raw) {
+  return String(raw || '').replace(/[^0-9+]/g, '');
+}
+
+function splitIntoOrders(text) {
+  const parts = text.split(/(?=ORDER\s*#\s*\d+)/i);
+  return parts.filter((p) => /ORDER\s*#\s*\d+/i.test(p));
+}
+
+function parseSingleOrder(block) {
+  const idMatch = block.match(/ORDER\s*#\s*(\d+)/i);
+  const orderId = idMatch ? idMatch[1] : '';
+
+  const lines = block.split(/\r?\n/).map((l) => l.trim());
+  const startIdx = lines.findIndex((l) => /^Shipping Address/i.test(l));
+  if (startIdx === -1) return null;
+  const slice = lines.slice(startIdx + 1);
+  const endIdx = slice.findIndex((l) => /^Marketing Notes:/i.test(l) || /^Shipping note:/i.test(l));
+  const block2 = endIdx === -1 ? slice : slice.slice(0, endIdx);
+
+  let name = '', address = '', country = 'US', city = '', state = '', zip = '', phone = '', email = '';
+  for (const raw of block2) {
+    if (!raw) continue;
+    if (/^Name:\s*/i.test(raw)) name = raw.replace(/^Name:\s*/i, '').trim();
+    else if (/^Address:\s*/i.test(raw)) address = raw.replace(/^Address:\s*/i, '').trim();
+    else if (/^Country:\s*/i.test(raw)) country = raw.replace(/^Country:\s*/i, '').trim();
+    else if (/^City:\s*/i.test(raw)) city = raw.replace(/^City:\s*/i, '').trim();
+    else if (/^State:\s*/i.test(raw)) state = raw.replace(/^State:\s*/i, '').trim();
+    else if (/^Zip:\s*/i.test(raw)) zip = raw.replace(/^Zip:\s*/i, '').trim();
+    else if (/^Phone:\s*/i.test(raw)) phone = cleanPhone(raw.replace(/^Phone:\s*/i, ''));
+    else if (/^Email:\s*/i.test(raw)) email = raw.replace(/^Email:\s*/i, '').trim();
+  }
+  if (/united states/i.test(country)) country = 'US';
+
+  const productMatch = block.match(/1\.\s+([^\n]+(?:\n[^\n]+)?)(?=\s*\d|\s*□)/i);
+  let productText = '';
+  if (productMatch) {
+    productText = productMatch[1].replace(/\s+/g, ' ').trim();
+  }
+
+  return {
+    source: 'k2',
+    orderId,
+    recipient: { name, line1: address, line2: '', city, state, postcode: zip, country, phone, email },
+    productText,
+    rawText: block,
+  };
+}
+
+function parse(text) {
+  const blocks = splitIntoOrders(text);
+  if (!blocks.length) return null;
+  const orders = blocks.map(parseSingleOrder).filter(Boolean);
+  if (orders.length === 1) return orders[0];
+  return { multi: true, orders };
+}
+
+  return { detect, parse };
+})();
+
+// === parsers/pdms.js ===
+const ParserPdms = (function () {
+const STATE_ABBR = {
+  alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA',
+  colorado: 'CO', connecticut: 'CT', delaware: 'DE', florida: 'FL', georgia: 'GA',
+  hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA',
+  kansas: 'KS', kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD',
+  massachusetts: 'MA', michigan: 'MI', minnesota: 'MN', mississippi: 'MS',
+  missouri: 'MO', montana: 'MT', nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH',
+  'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC',
+  'north dakota': 'ND', ohio: 'OH', oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA',
+  'rhode island': 'RI', 'south carolina': 'SC', 'south dakota': 'SD', tennessee: 'TN',
+  texas: 'TX', utah: 'UT', vermont: 'VT', virginia: 'VA', washington: 'WA',
+  'west virginia': 'WV', wisconsin: 'WI', wyoming: 'WY',
+};
+
+function abbr(name) {
+  const key = String(name || '').trim().toLowerCase();
+  return STATE_ABBR[key] || String(name || '').trim().toUpperCase();
+}
+
+function detect(text) {
+  return /PRESCRIPTION/i.test(text) && /Patient Details:/i.test(text);
+}
+
+function findValueAfter(text, label) {
+  const sameLine = new RegExp(`^\\s*${label}\\s{2,}([^\\n]+)$`, 'im');
+  const m1 = text.match(sameLine);
+  if (m1 && m1[1].trim()) return m1[1].trim();
+  const nextLines = new RegExp(`${label}\\s*\\n+\\s*([^\\n]+)`, 'i');
+  const m2 = text.match(nextLines);
+  return m2 ? m2[1].trim() : '';
+}
+
+function parseAddress(addressLine) {
+  const united = addressLine.replace(/\s*United States\s*$/i, '').trim();
+
+  let m = united.match(/^(.+),\s*([^,]+),\s*([^,]+)\s+([0-9]{5}(?:-[0-9]{4})?)$/);
+  if (m) {
+    return { line1: m[1].trim(), city: m[2].trim(), state: abbr(m[3]), postcode: m[4] };
+  }
+  m = united.match(/^(.+),\s*(.+?)\s+([A-Z]{2})\s+([0-9]{5}(?:-[0-9]{4})?)$/);
+  if (m) {
+    return { line1: m[1].trim(), city: m[2].trim(), state: m[3], postcode: m[4] };
+  }
+  return { line1: united, city: '', state: '', postcode: '' };
+}
+
+function parse(text) {
+  if (!detect(text)) return null;
+  const t = text;
+
+  const name = findValueAfter(t, /Name/.source);
+  const addressLine = findValueAfter(t, /Address/.source);
+  const phone = findValueAfter(t, /Phone/.source).replace(/[^0-9+]/g, '');
+  const drugMatch = t.match(/Drug Name:\s*Brand \(Generic\)\s*\n+\s*([^\n]+)/i);
+  const productText = drugMatch ? drugMatch[1].trim() : '';
+
+  const addr = parseAddress(addressLine);
+
+  return {
+    source: 'pdms',
+    orderId: '',
+    recipient: {
+      name,
+      line1: addr.line1,
+      line2: '',
+      city: addr.city,
+      state: addr.state,
+      postcode: addr.postcode,
+      country: 'US',
+      phone,
+      email: '',
+    },
+    productText,
+    rawText: t,
+  };
+}
+
+  return { detect, parse };
+})();
+
+// === parsers/secil.js ===
+const ParserSecil = (function () {
+const CITY_STATE_ZIP_COMMA = /^([^,]+),\s*([A-Z]{2})[,]?\s*([0-9]{5}(?:-[0-9]{4})?)$/;
+const CITY_STATE_ZIP_SPACES = /^([^,]+?)\s+([A-Z]{2})\s+([0-9]{5}(?:-[0-9]{4})?)$/;
+const STATE_FULL = {
+  alabama: 'AL', alaska: 'AK', arizona: 'AZ', arkansas: 'AR', california: 'CA',
+  colorado: 'CO', connecticut: 'CT', delaware: 'DE', florida: 'FL', georgia: 'GA',
+  hawaii: 'HI', idaho: 'ID', illinois: 'IL', indiana: 'IN', iowa: 'IA',
+  kansas: 'KS', kentucky: 'KY', louisiana: 'LA', maine: 'ME', maryland: 'MD',
+  massachusetts: 'MA', michigan: 'MI', minnesota: 'MN', mississippi: 'MS',
+  missouri: 'MO', montana: 'MT', nebraska: 'NE', nevada: 'NV', 'new hampshire': 'NH',
+  'new jersey': 'NJ', 'new mexico': 'NM', 'new york': 'NY', 'north carolina': 'NC',
+  'north dakota': 'ND', ohio: 'OH', oklahoma: 'OK', oregon: 'OR', pennsylvania: 'PA',
+  'rhode island': 'RI', 'south carolina': 'SC', 'south dakota': 'SD', tennessee: 'TN',
+  texas: 'TX', utah: 'UT', vermont: 'VT', virginia: 'VA', washington: 'WA',
+  'west virginia': 'WV', wisconsin: 'WI', wyoming: 'WY',
+};
+
+function detect(text) {
+  if (/Products Ordered:/i.test(text) && /^Order/im.test(text) && !/A-Stock/i.test(text)) {
+    return true;
+  }
+  return false;
+}
+
+function isPhone(line) {
+  const cleaned = line.replace(/[^0-9+]/g, '');
+  return /^\+?\d{10,}$/.test(cleaned);
+}
+function isEmail(line) {
+  return /\S+@\S+\.\S+/.test(line);
+}
+function isDate(line) {
+  return /^\d{1,2}\.\d{1,2}\.\d{4}$/.test(line.trim());
+}
+function isOrderHeader(line) {
+  return /^Orders?[\s-]\d+/i.test(line.trim());
+}
+
+function tryCityStateZip(raw) {
+  const noTrailingComma = raw.replace(/,\s*$/, '');
+  let m = noTrailingComma.match(CITY_STATE_ZIP_COMMA);
+  if (m) return { city: m[1].trim(), state: m[2], postcode: m[3] };
+  m = noTrailingComma.match(CITY_STATE_ZIP_SPACES);
+  if (m) {
+    const zip = m[3].replace(/\s/g, '');
+    return { city: m[1].trim(), state: m[2], postcode: zip };
+  }
+  m = noTrailingComma.match(/^([^,]+),\s*([A-Z]{2})\s+([0-9]{4,5}\s?[0-9]{0,5})$/);
+  if (m) return { city: m[1].trim(), state: m[2], postcode: m[3].replace(/\s/g, '') };
+  m = noTrailingComma.match(/^([A-Za-z][^,]+),\s*([A-Za-z\s]+)\s+([0-9]{5}(?:-[0-9]{4})?)$/);
+  if (m) {
+    const stateName = m[2].trim();
+    const stateAbbr = STATE_FULL[stateName.toLowerCase()] || stateName.toUpperCase();
+    return { city: m[1].trim(), state: stateAbbr, postcode: m[3] };
+  }
+  return null;
+}
+
+function parse(text) {
+  const lines = text.split(/\r?\n/).map((l) => l.trim());
+  const productsIdx = lines.findIndex((l) => /^Products Ordered:/i.test(l));
+  if (productsIdx === -1) return null;
+  const header = lines.slice(0, productsIdx).filter((l) => l && !isDate(l) && !isOrderHeader(l));
+
+  let name = '', phone = '', email = '', city = '', state = '', zip = '';
+  const addressLines = [];
+  for (const raw of header) {
+    if (isEmail(raw)) { email = raw; continue; }
+    if (isPhone(raw)) { phone = raw.replace(/[^0-9+]/g, ''); continue; }
+    const csz = tryCityStateZip(raw);
+    if (csz) { city = csz.city; state = csz.state; zip = csz.postcode; continue; }
+    if (!name) { name = raw; continue; }
+    addressLines.push(raw);
+  }
+
+  const productLine = lines
+    .slice(productsIdx + 1)
+    .map((l) => l.replace(/^[•\-\*]\s*/, '').trim())
+    .find((l) => !!l) || '';
+
+  return {
+    source: 'secil',
+    orderId: '',
+    recipient: {
+      name,
+      line1: addressLines[0] || '',
+      line2: addressLines[1] || '',
+      city,
+      state,
+      postcode: zip,
+      country: 'US',
+      phone,
+      email,
+    },
+    productText: productLine,
+    rawText: text,
+  };
+}
+
+  return { detect, parse };
+})();
+
+// === parsers/index.js ===
+const ParserIndex = (function () {
+const activa = ParserActiva;
+const dh = ParserDh;
+const k2 = ParserK2;
+const pdms = ParserPdms;
+const secil = ParserSecil;
+
+const PARSERS = [
+  { name: 'pdms', mod: pdms },
+  { name: 'dh', mod: dh },
+  { name: 'k2', mod: k2 },
+  { name: 'activa', mod: activa },
+  { name: 'secil', mod: secil },
+];
+
+function dispatch(text) {
+  for (const p of PARSERS) {
+    if (p.mod.detect(text)) {
+      const result = p.mod.parse(text);
+      if (!result) continue;
+      if (result.multi) {
+        return result.orders.map((o) => ({ ...o, source: o.source || p.name }));
+      }
+      return [result];
+    }
+  }
+  return [];
+}
+
+
+
+  return { dispatch, activa, dh, k2, pdms, secil };
+})();
+
+// === app.js ===
+const AppModule = (function () {
+const dispatch = ParserIndex.dispatch;
+const readPdfText = ModPdfReader.readPdfText;
+const PRODUCTS = ModMid.PRODUCTS;
+const detectProduct = ModMid.detectProduct;
+const findProductByKey = ModMid.findProductByKey;
+const buildAOA = ModExporter.buildAOA;
+const buildFileName = ModExporter.buildFileName;
+const HEADER_ROW = ModBuildRow.HEADER_ROW;
+const buildRow = ModBuildRow.buildRow;
+
+function createApp({ document, window, pdfjsLib, XLSX }) {
+  const dropZone = document.getElementById('drop-zone');
+  const filePicker = document.getElementById('file-picker');
+  const folderPicker = document.getElementById('folder-picker');
+  const clearBtn = document.getElementById('btn-clear');
+  const downloadBtn = document.getElementById('btn-download');
+  const tableHead = document.getElementById('table-head');
+  const tableBody = document.getElementById('table-body');
+  const statusEl = document.getElementById('status');
+  const summary = document.getElementById('summary');
+
+  const headers = HEADER_ROW();
+  let orders = [];
+
+  renderHeader();
+  renderRows();
+
+  dropZone.addEventListener('click', () => filePicker.click());
+  dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+  });
+  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+  dropZone.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    const files = await readDataTransfer(e.dataTransfer);
+    await ingestFiles(files);
+  });
+
+  filePicker.addEventListener('change', async (e) => {
+    await ingestFiles(Array.from(e.target.files));
+    e.target.value = '';
+  });
+  folderPicker.addEventListener('change', async (e) => {
+    await ingestFiles(Array.from(e.target.files));
+    e.target.value = '';
+  });
+
+  clearBtn.addEventListener('click', () => {
+    orders = [];
+    statusEl.textContent = '';
+    renderRows();
+  });
+
+  downloadBtn.addEventListener('click', () => {
+    if (!orders.length) return;
+    const aoa = buildAOA(orders.map((o) => ({ recipient: o.recipient, product: o.product })));
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = aoa[0].map(() => ({ wch: 28.875 }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = buildFileName(orders.length);
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 200);
+    setStatus(`Downloaded ${a.download}`, 'ok');
+  });
+
+  function setStatus(msg, level = '') {
+    const line = document.createElement('div');
+    line.className = `status-line ${level}`;
+    line.textContent = msg;
+    statusEl.appendChild(line);
+    while (statusEl.children.length > 12) statusEl.removeChild(statusEl.firstChild);
+  }
+
+  async function ingestFiles(fileList) {
+    const pdfs = fileList.filter((f) => /\.pdf$/i.test(f.name));
+    if (!pdfs.length) {
+      setStatus('No PDF files found in selection.', 'warn');
+      renderRows();
+      return;
+    }
+    setStatus(`Reading ${pdfs.length} PDF(s)…`);
+    for (const file of pdfs) {
+      try {
+        const text = await readPdfText(file, pdfjsLib);
+        const parsed = dispatch(text);
+        if (!parsed.length) {
+          setStatus(`${file.name}: format not recognised.`, 'err');
+          continue;
+        }
+        for (const order of parsed) {
+          const product = detectProduct(order.productText) || detectProduct(text);
+          orders.push({
+            fileName: file.name,
+            source: order.source,
+            recipient: order.recipient,
+            productText: order.productText,
+            product: product || null,
+            orderId: order.orderId || '',
+          });
+        }
+        setStatus(`${file.name}: parsed (${parsed.length} order${parsed.length > 1 ? 's' : ''}).`, 'ok');
+      } catch (err) {
+        setStatus(`${file.name}: ${err.message}`, 'err');
+      }
+    }
+    renderRows();
+  }
+
+  function renderHeader() {
+    tableHead.innerHTML = '';
+    const tr = document.createElement('tr');
+    const headerSeq = ['File', 'Source', 'Product (MID)'].concat(headers);
+    for (const h of headerSeq) {
+      const th = document.createElement('th');
+      th.textContent = h;
+      tr.appendChild(th);
+    }
+    tableHead.appendChild(tr);
+  }
+
+  function renderRows() {
+    tableBody.innerHTML = '';
+    orders.forEach((o, idx) => {
+      const tr = document.createElement('tr');
+      const cells = buildRow({ recipient: o.recipient, product: o.product }, idx);
+      const hasResolvedProduct = !!o.product && !!o.product.mid;
+      if (!hasResolvedProduct) tr.classList.add('invalid');
+
+      const fileTd = document.createElement('td');
+      fileTd.className = 'col-file';
+      fileTd.textContent = o.fileName;
+      tr.appendChild(fileTd);
+
+      const srcTd = document.createElement('td');
+      srcTd.textContent = o.source || '';
+      tr.appendChild(srcTd);
+
+      const prodTd = document.createElement('td');
+      prodTd.className = 'col-product';
+      const sel = document.createElement('select');
+      const empty = document.createElement('option');
+      empty.value = '';
+      empty.textContent = '— pick product —';
+      sel.appendChild(empty);
+      for (const p of PRODUCTS) {
+        const opt = document.createElement('option');
+        opt.value = p.key;
+        opt.textContent = `${p.label}${p.mid ? ` (${p.mid})` : ''}`;
+        if (o.product && o.product.key === p.key) opt.selected = true;
+        sel.appendChild(opt);
+      }
+      sel.addEventListener('change', () => {
+        const product = findProductByKey(sel.value);
+        orders[idx].product = product || null;
+        renderRows();
+      });
+      prodTd.appendChild(sel);
+      tr.appendChild(prodTd);
+
+      cells.forEach((value, colIdx) => {
+        const td = document.createElement('td');
+        td.textContent = value;
+        td.setAttribute('contenteditable', 'true');
+        td.dataset.colIdx = colIdx;
+        td.addEventListener('input', () => {
+          orders[idx].overrides = orders[idx].overrides || {};
+          orders[idx].overrides[colIdx] = td.textContent;
+        });
+        tr.appendChild(td);
+      });
+
+      tableBody.appendChild(tr);
+    });
+    const unresolved = orders.filter((o) => !o.product || !o.product.mid).length;
+    downloadBtn.disabled = !orders.length || unresolved > 0;
+    summary.innerHTML = orders.length
+      ? `<strong>${orders.length}</strong> shipment${orders.length > 1 ? 's' : ''} loaded${
+          unresolved
+            ? `, <span style="color:var(--err)"><strong>${unresolved}</strong> need a product assigned</span>`
+            : ''
+        }.`
+      : 'Drop PDFs above to begin.';
+  }
+
+  async function readDataTransfer(dt) {
+    const items = dt.items ? Array.from(dt.items) : [];
+    const out = [];
+    if (items.length && typeof items[0].webkitGetAsEntry === 'function') {
+      const entries = items.map((it) => it.webkitGetAsEntry()).filter(Boolean);
+      await Promise.all(entries.map((e) => walkEntry(e, out)));
+      return out;
+    }
+    return Array.from(dt.files);
+  }
+
+  async function walkEntry(entry, out) {
+    if (entry.isFile) {
+      const file = await new Promise((resolve, reject) => entry.file(resolve, reject));
+      out.push(file);
+      return;
+    }
+    if (entry.isDirectory) {
+      const reader = entry.createReader();
+      const all = [];
+      while (true) {
+        const batch = await new Promise((resolve, reject) =>
+          reader.readEntries(resolve, reject)
+        );
+        if (!batch.length) break;
+        all.push(...batch);
+      }
+      await Promise.all(all.map((e) => walkEntry(e, out)));
+    }
+  }
+
+  return {
+    get orders() { return orders; },
+    ingestFiles,
+  };
+}
+
+  return { createApp };
+})();
+
+window.AppModule = AppModule;
+window.ModBuildRow = ModBuildRow;
+window.ModExporter = ModExporter;
+window.ModMid = ModMid;
+window.ModPdfReader = ModPdfReader;
+window.ParserIndex = ParserIndex;
+
+
+(function bootstrap() {
+  document.getElementById('btn-add-folder').addEventListener('click', function () {
+    document.getElementById('folder-picker').click();
+  });
+  window.__appInstance__ = AppModule.createApp({
+    document: document,
+    window: window,
+    pdfjsLib: window.pdfjsLib,
+    XLSX: window.XLSX,
+  });
+})();
+</script>
+</body>
+</html>
