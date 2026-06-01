@@ -40,6 +40,9 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
   const trackingStatus = document.getElementById('tracking-status');
 
   const API_BASE_KEY = 'pharmaconsulta_tracking_api_base';
+  // Default Cloudflare Worker (D1) endpoint. Used unless the user overrides it
+  // via the Sync API URL box (saving an explicit value — including blank).
+  const DEFAULT_API_BASE = 'https://pharmaconsulta-tracking.labrint.workers.dev';
 
   const headers = HEADER_ROW();
   let orders = [];
@@ -227,10 +230,10 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
 
   function getApiBase() {
     try {
-      return (window.localStorage.getItem(API_BASE_KEY) || '').trim();
-    } catch {
-      return '';
-    }
+      const stored = window.localStorage.getItem(API_BASE_KEY);
+      if (stored !== null) return stored.trim();
+    } catch {}
+    return DEFAULT_API_BASE;
   }
 
   function makeStore() {
