@@ -92,8 +92,6 @@ button.danger { color: var(--err); }
 table {
   border-collapse: collapse;
   font-size: 12px;
-  width: 100%;
-  table-layout: fixed;
 }
 thead th {
   background: #1f2b58;
@@ -103,19 +101,20 @@ thead th {
   text-align: left;
   font-weight: 600;
   border-bottom: 1px solid #334155;
-  white-space: normal;
-  word-break: normal;
-  overflow-wrap: break-word;
   font-size: 11px;
   line-height: 1.25;
 }
-tbody td {
+/* FedEx preview: 55 columns can't fit the viewport, so keep it readable and
+   let this one table scroll sideways (the tracking sheet below fits fully). */
+#preview-wrapper table { width: max-content; table-layout: auto; }
+#preview-wrapper thead th { white-space: nowrap; }
+#preview-wrapper tbody td {
   padding: 4px 8px;
   border-bottom: 1px solid var(--border);
-  white-space: normal;
-  word-break: break-word;
-  overflow-wrap: anywhere;
-  vertical-align: top;
+  white-space: nowrap;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 tbody tr.invalid { background: rgba(248, 113, 113, 0.08); }
 tbody td[contenteditable="true"]:focus {
