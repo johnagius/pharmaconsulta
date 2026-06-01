@@ -22,6 +22,26 @@ jobs:
           node-version: 20
       - run: npm install
       # The token never appears in code or logs — it comes from repo secrets.
+      # Create the D1 database on first run, then resolve its id and inject it
+      # into wrangler.toml so this works with no manual setup.
+      - name: Ensure D1 database + resolve id
+        run: |
+          set -e
+          npx wrangler d1 create pharmaconsulta_tracking || echo "database already exists, continuing"
+          ID=$(npx wrangler d1 list --json | node -e "
+            let d='';
+            process.stdin.on('data', c => d += c).on('end', () => {
+              const list = JSON.parse(d || '[]');
+              const row = list.find(r => r.name === 'pharmaconsulta_tracking') || {};
+              process.stdout.write(row.uuid || row.database_id || row.id || '');
+            });
+          ")
+          if [ -z "$ID" ]; then echo "Could not resolve D1 database id"; exit 1; fi
+          echo "Using D1 database id $ID"
+          sed -i "s/REPLACE_WITH_YOUR_D1_DATABASE_ID/$ID/" wrangler.toml
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
       - name: Apply D1 migrations
         run: npx wrangler d1 migrations apply pharmaconsulta_tracking --remote
         env:
