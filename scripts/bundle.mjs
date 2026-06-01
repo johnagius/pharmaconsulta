@@ -154,6 +154,7 @@ window.ModPdfReader = ModPdfReader;
 window.ParserIndex = ParserIndex;
 `;
 
+  const BUILD_STAMP = new Date().toISOString().replace('T', ' ').slice(0, 16) + ' UTC';
   const PDFJS_VERSION = '3.11.174';
   const XLSX_VERSION = '0.18.5';
   const PDFJS_CDN = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${PDFJS_VERSION}/build/pdf.min.js`;
@@ -217,7 +218,7 @@ ${css}
   </div>
 </main>
 <footer>
-  PharmaConsulta &middot; runs entirely in your browser. Saved tracking rows go only to the database you configure.
+  PharmaConsulta &middot; runs entirely in your browser. Saved tracking rows go only to the database you configure. &middot; build ${BUILD_STAMP}
 </footer>
 <script src="${PDFJS_CDN}" crossorigin="anonymous"></script>
 <script src="${XLSX_CDN}" crossorigin="anonymous"></script>

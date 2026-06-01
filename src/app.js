@@ -304,7 +304,21 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
     renderTracking();
   }
 
+  // Proportional column widths (%) aligned with TRACKING_HEADERS + Actions.
+  const TRACKING_COL_WIDTHS = [5, 6, 6, 6, 8, 4, 10, 7, 6, 7, 7, 6, 8, 8, 6];
+
   function renderTrackingHeader() {
+    const table = trackingHead.parentElement;
+    const oldCols = table.querySelector('colgroup');
+    if (oldCols) oldCols.remove();
+    const colgroup = document.createElement('colgroup');
+    TRACKING_COL_WIDTHS.forEach((w) => {
+      const col = document.createElement('col');
+      col.style.width = `${w}%`;
+      colgroup.appendChild(col);
+    });
+    table.insertBefore(colgroup, table.firstChild);
+
     trackingHead.innerHTML = '';
     const tr = document.createElement('tr');
     for (const h of TRACKING_HEADERS.concat(['Actions'])) {

@@ -43,8 +43,8 @@ header p {
   font-size: 13px;
 }
 main {
-  padding: 24px 32px 48px;
-  max-width: 1400px;
+  padding: 24px 20px 48px;
+  max-width: none;
   margin: 0 auto;
 }
 #drop-zone {
@@ -100,7 +100,8 @@ button.danger { color: var(--err); }
 table {
   border-collapse: collapse;
   font-size: 12px;
-  width: max-content;
+  width: 100%;
+  table-layout: fixed;
 }
 thead th {
   background: #1f2b58;
@@ -110,15 +111,16 @@ thead th {
   text-align: left;
   font-weight: 600;
   border-bottom: 1px solid #334155;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
 }
 tbody td {
   padding: 4px 8px;
   border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  vertical-align: top;
 }
 tbody tr.invalid { background: rgba(248, 113, 113, 0.08); }
 tbody td[contenteditable="true"]:focus {
@@ -132,7 +134,7 @@ td.col-product select {
   border-radius: 6px;
   font-size: 12px;
   padding: 2px 6px;
-  max-width: 200px;
+  width: 100%;
 }
 td.col-file { color: var(--muted); }
 .badge {
@@ -208,21 +210,22 @@ footer {
   background: var(--panel);
   max-height: 70vh;
 }
-#tracking-table { border-collapse: collapse; font-size: 12px; width: max-content; }
+#tracking-table { border-collapse: collapse; font-size: 12px; width: 100%; table-layout: fixed; }
 #tracking-table thead th {
   background: #1f2b58;
   position: sticky;
   top: 0;
-  padding: 6px 8px;
+  padding: 6px 6px;
   text-align: left;
   font-weight: 600;
   border-bottom: 1px solid #334155;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
 }
 #tracking-table tbody td {
-  padding: 4px 6px;
+  padding: 4px 5px;
   border-bottom: 1px solid var(--border);
-  white-space: nowrap;
+  white-space: normal;
   vertical-align: top;
 }
 #tracking-table tbody tr.saved { background: rgba(74, 222, 128, 0.06); }
@@ -233,16 +236,14 @@ footer {
   border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 12px;
-  padding: 4px 6px;
+  padding: 4px 5px;
+  width: 100%;
+  min-width: 0;
 }
 #tracking-table input:focus,
 #tracking-table select:focus { outline: 2px solid var(--accent); }
-#tracking-table input.w-sm { width: 56px; }
-#tracking-table input.w-md { width: 120px; }
-#tracking-table input.w-lg { width: 200px; }
-#tracking-table input.w-xl { width: 260px; }
-#tracking-table .row-actions { display: flex; gap: 4px; }
-#tracking-table .row-actions button { padding: 4px 8px; font-size: 11px; }
+#tracking-table .row-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+#tracking-table .row-actions button { padding: 4px 6px; font-size: 11px; flex: 1 1 auto; }
 #tracking-status { font-size: 12px; color: var(--muted); margin: 8px 0; min-height: 18px; }
 
 </style>
@@ -293,7 +294,7 @@ footer {
   </div>
 </main>
 <footer>
-  PharmaConsulta &middot; runs entirely in your browser. Saved tracking rows go only to the database you configure.
+  PharmaConsulta &middot; runs entirely in your browser. Saved tracking rows go only to the database you configure. &middot; build 2026-06-01 08:45 UTC
 </footer>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
@@ -1732,7 +1733,21 @@ function createApp({ document, window, pdfjsLib, XLSX }) {
     renderTracking();
   }
 
+  // Proportional column widths (%) aligned with TRACKING_HEADERS + Actions.
+  const TRACKING_COL_WIDTHS = [5, 6, 6, 6, 8, 4, 10, 7, 6, 7, 7, 6, 8, 8, 6];
+
   function renderTrackingHeader() {
+    const table = trackingHead.parentElement;
+    const oldCols = table.querySelector('colgroup');
+    if (oldCols) oldCols.remove();
+    const colgroup = document.createElement('colgroup');
+    TRACKING_COL_WIDTHS.forEach((w) => {
+      const col = document.createElement('col');
+      col.style.width = `${w}%`;
+      colgroup.appendChild(col);
+    });
+    table.insertBefore(colgroup, table.firstChild);
+
     trackingHead.innerHTML = '';
     const tr = document.createElement('tr');
     for (const h of TRACKING_HEADERS.concat(['Actions'])) {
