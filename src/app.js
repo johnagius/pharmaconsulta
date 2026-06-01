@@ -11,6 +11,7 @@ import {
   trackingRowToCells,
   parseProductLines,
   formatDateDDMMYY,
+  dateCompact,
   weekdayName,
   orderNumberFor,
   setWeekdayWithinWeek,
@@ -192,6 +193,7 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
     setStatus(`Reading ${pdfs.length} PDF(s)…`);
     let skipped = 0;
     const beforeCount = orders.length;
+    const today = new Date();
     for (const file of pdfs) {
       try {
         const text = await readPdfText(file, pdfjsLib);
@@ -216,6 +218,8 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
             orderId: order.orderId || '',
             text,
             dedupKey,
+            // Unique daily order number assigned once per order (per PDF/order).
+            orderNumber: orderNumberFor(today, nextOrderSeq(dateCompact(today))),
             merchant: md ? md.merchant : '',
             merchantVia: md ? md.via : '',
           });
@@ -1405,6 +1409,15 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
     if (fedexAutosave) fedexAutosave.checked = autosaveOn('fedex');
     if (trackAutosave) trackAutosave.checked = autosaveOn('rows');
   }
+
+  // Persistent daily order-number counter (ddmmyy-N), shared via settings/D1,
+  // so each new PDF gets a distinct number for that day.
+  function nextOrderSeq(compact) {
+    const key = `orderseq_${compact}`;
+    const next = toNum(getSetting(key, '0')) + 1;
+    setSetting(key, String(next));
+    return next;
+  }
   // Debounced autosave timers keyed by the row/order object.
   const autosaveTimers = new WeakMap();
   function scheduleAutosave(obj, fn) {
@@ -1449,6 +1462,7 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
       );
       row._origin = 'order';
       row.dedupKey = o.dedupKey || '';
+      if (o.orderNumber) row.orderNumber = o.orderNumber; // keep the assigned daily number
       return row;
     });
   }
