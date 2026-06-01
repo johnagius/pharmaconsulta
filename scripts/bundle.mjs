@@ -294,12 +294,24 @@ ${css}
         <select id="stock-merchant"></select>
       </label>
       <button id="btn-stock-refresh" class="primary" type="button">Refresh</button>
-      <button id="btn-stock-from-orders" type="button">Pull loaded orders &rarr; pending</button>
-      <button id="btn-stock-from-fedex" type="button">Pull from Saved FedEx &rarr; pending</button>
+      <button id="btn-stock-from-tracking" type="button">Pull from Tracking &rarr; pending</button>
       <button id="btn-stock-add-manual" type="button">+ Manual movement</button>
-      <button id="btn-stock-copy-moves" type="button">Copy confirmed movements</button>
     </div>
     <div id="stock-status" aria-live="polite"></div>
+
+    <div id="stock-tracking-picker" class="hidden">
+      <h3 class="sub-head">Select tracking rows to add (for merchant chosen above)</h3>
+      <div class="actions">
+        <button id="btn-stock-picker-add" class="primary" type="button">Add selected &rarr; pending</button>
+        <button id="btn-stock-picker-cancel" type="button">Cancel</button>
+      </div>
+      <div class="scroll-box">
+        <table class="track-table" aria-label="Pick tracking rows">
+          <thead id="stock-picker-head"></thead>
+          <tbody id="stock-picker-body"></tbody>
+        </table>
+      </div>
+    </div>
 
     <h3 class="sub-head">Pending movements</h3>
     <div class="scroll-box">

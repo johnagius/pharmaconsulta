@@ -57,10 +57,13 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
   // Stock tab
   const stockMerchantSel = document.getElementById('stock-merchant');
   const stockRefresh = document.getElementById('btn-stock-refresh');
-  const stockFromOrders = document.getElementById('btn-stock-from-orders');
-  const stockFromFedex = document.getElementById('btn-stock-from-fedex');
+  const stockFromTracking = document.getElementById('btn-stock-from-tracking');
   const stockAddManual = document.getElementById('btn-stock-add-manual');
-  const stockCopyMoves = document.getElementById('btn-stock-copy-moves');
+  const stockPicker = document.getElementById('stock-tracking-picker');
+  const stockPickerHead = document.getElementById('stock-picker-head');
+  const stockPickerBody = document.getElementById('stock-picker-body');
+  const stockPickerAdd = document.getElementById('btn-stock-picker-add');
+  const stockPickerCancel = document.getElementById('btn-stock-picker-cancel');
   const stockStatus = document.getElementById('stock-status');
   const stockPendingHead = document.getElementById('stock-pending-head');
   const stockPendingBody = document.getElementById('stock-pending-body');
@@ -186,6 +189,7 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
     }
     setStatus(`Reading ${pdfs.length} PDF(s)…`);
     let skipped = 0;
+    const beforeCount = orders.length;
     for (const file of pdfs) {
       try {
         const text = await readPdfText(file, pdfjsLib);
@@ -231,6 +235,14 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
     }
     if (autosaveOn('rows')) {
       trackingRows.forEach((r) => { if (!r.id) saveRow(r, { silent: true }); });
+    }
+    // Offer to add the freshly parsed orders to the stock movement sheet.
+    const added = orders.length - beforeCount;
+    if (added > 0 && typeof window.confirm === 'function') {
+      if (window.confirm(`Add ${added} parsed order(s) to the stock movement sheet as pending movements?`)) {
+        await pullOrdersToPending();
+        setStatus('Added to Stock as pending — review and confirm them in the Stock tab.', 'ok');
+      }
     }
   }
 
@@ -818,10 +830,12 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
   // ---- Stock ----
   function initStock() {
     if (stockRefresh) stockRefresh.addEventListener('click', loadStock);
-    if (stockFromOrders) stockFromOrders.addEventListener('click', pullOrdersToPending);
-    if (stockFromFedex) stockFromFedex.addEventListener('click', pullSavedFedexToPending);
+    if (stockFromTracking) stockFromTracking.addEventListener('click', openTrackingPicker);
     if (stockAddManual) stockAddManual.addEventListener('click', addManualMove);
-    if (stockCopyMoves) stockCopyMoves.addEventListener('click', copyConfirmedMoves);
+    if (stockPickerAdd) stockPickerAdd.addEventListener('click', addSelectedTracking);
+    if (stockPickerCancel) {
+      stockPickerCancel.addEventListener('click', () => { if (stockPicker) stockPicker.classList.add('hidden'); });
+    }
     if (stockAddItem) stockAddItem.addEventListener('click', addStockItem);
     if (stockMerchantSel) {
       stockMerchantSel.addEventListener('change', () => {
@@ -914,51 +928,90 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
     renderStock();
   }
 
-  // Back-fill pending movements from shipments already saved in D1 (FedEx).
-  async function pullSavedFedexToPending() {
-    if (!savedFedexRows.length) await loadSavedFedex();
-    if (!savedFedexRows.length) {
-      setStatusInto(stockStatus, 'No saved FedEx shipments to pull from.', 'warn');
+  // --- Pull from the tracking sheet (select which rows) ---
+  async function openTrackingPicker() {
+    if (!stockMerchant) {
+      setStatusInto(stockStatus, 'Pick a merchant above first — pulled rows are filed under it.', 'warn');
       return;
     }
+    if (!savedTrackingRows.length) await loadSavedRows();
+    renderTrackingPicker();
+    if (stockPicker) stockPicker.classList.remove('hidden');
+    if (!savedTrackingRows.length) {
+      setStatusInto(stockStatus, 'No saved tracking rows yet — save some from the Builder first.', 'warn');
+    }
+  }
+
+  function renderTrackingPicker() {
+    if (!stockPickerHead || !stockPickerBody) return;
+    stockPickerHead.innerHTML = '';
+    const htr = document.createElement('tr');
+    for (const h of ['Add', 'Date', 'Order #', 'Client', 'Product', 'Quantity']) {
+      const th = document.createElement('th');
+      th.textContent = h;
+      htr.appendChild(th);
+    }
+    stockPickerHead.appendChild(htr);
+
+    stockPickerBody.innerHTML = '';
+    savedTrackingRows.forEach((row) => {
+      const tr = document.createElement('tr');
+      const td = (node) => { const c = document.createElement('td'); if (typeof node === 'string') c.textContent = node; else c.appendChild(node); tr.appendChild(c); };
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.dataset.id = row.id != null ? row.id : '';
+      row._pick = cb;
+      td(cb);
+      td(row.date || '');
+      td(row.orderNumber || '');
+      td(row.client || '');
+      td(row.product || '');
+      td(row.quantity || '');
+      stockPickerBody.appendChild(tr);
+    });
+  }
+
+  async function addSelectedTracking() {
+    const chosen = savedTrackingRows.filter((r) => r._pick && r._pick.checked);
+    if (!chosen.length) { setStatusInto(stockStatus, 'Tick at least one tracking row.', 'warn'); return; }
     const store = makeStore('stockmoves');
-    const today = toISODate(new Date());
     let made = 0;
-    for (const s of savedFedexRows) {
-      const merchant = SOURCE_TO_MERCHANT[s.source] || '';
-      const prod = findProductByKey(s.productKey);
-      const label = (prod && prod.label) || s.productKey || s.recipientName || 'Unknown';
-      const qtyCell = Array.isArray(s.cells) ? toNum(s.cells[36]) : 0; // commodityQuantity
-      const qty = String(-(Math.abs(qtyCell) || 1));
-      const orderKey = s.dedupKey || `fedex-${s.id}`;
-      const dedupKey = movementDedupKey(orderKey, label);
-      if (stockMoves.some((m) => m.dedupKey === dedupKey)) continue;
-      const move = {
-        merchant,
-        itemId: suggestItemId(stockItems, merchant, s.productKey) || '',
-        product: label,
-        qty,
-        date: today,
-        country: '',
-        batch: '',
-        section: '',
-        status: 'pending',
-        orderKey,
-        note: 'from saved FedEx',
-        dedupKey,
-      };
-      try {
-        // eslint-disable-next-line no-await-in-loop
-        const saved = await store.save(move);
-        saved._matchKey = s.productKey;
-        const i = stockMoves.findIndex((m) => String(m.id) === String(saved.id));
-        if (i >= 0) stockMoves[i] = saved; else stockMoves.push(saved);
-        made += 1;
-      } catch (err) {
-        setStatusInto(stockStatus, `Save failed: ${err.message}`, 'err');
+    for (const row of chosen) {
+      const products = String(row.product || '').split(',').map((s) => s.trim()).filter(Boolean);
+      const qtys = String(row.quantity || '').split(',').map((s) => s.trim());
+      for (let i = 0; i < products.length; i += 1) {
+        const label = products[i];
+        const qtyNum = Math.abs(toNum(qtys[i])) || 1;
+        const orderKey = `track-${row.id || row.orderNumber}`;
+        const dedupKey = movementDedupKey(orderKey, label);
+        if (stockMoves.some((m) => m.dedupKey === dedupKey)) continue;
+        const move = {
+          merchant: stockMerchant,
+          itemId: '',
+          product: label,
+          qty: String(-qtyNum),
+          date: row.isoDate || row.date || toISODate(new Date()),
+          country: row.destState || '',
+          batch: '',
+          section: '',
+          status: 'pending',
+          orderKey,
+          note: 'from tracking',
+          dedupKey,
+        };
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const saved = await store.save(move);
+          const idx = stockMoves.findIndex((m) => String(m.id) === String(saved.id));
+          if (idx >= 0) stockMoves[idx] = saved; else stockMoves.push(saved);
+          made += 1;
+        } catch (err) {
+          setStatusInto(stockStatus, `Save failed: ${err.message}`, 'err');
+        }
       }
     }
-    setStatusInto(stockStatus, `Added ${made} pending movement(s) from saved FedEx.`, made ? 'ok' : 'warn');
+    if (stockPicker) stockPicker.classList.add('hidden');
+    setStatusInto(stockStatus, `Added ${made} pending movement(s) from ${chosen.length} tracking row(s).`, made ? 'ok' : 'warn');
     renderStock();
   }
 
