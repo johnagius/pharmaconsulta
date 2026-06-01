@@ -529,6 +529,7 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
     orders = orders.filter((x) => x !== o);
     setFedexStatus('Shipment removed.', 'ok');
     renderRows();
+    await deleteLinkedByDedup('rows', o.dedupKey);
   }
 
   async function saveAllFedex() {
@@ -713,6 +714,7 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
           savedFedexRows = savedFedexRows.filter((r) => r !== s);
           setStatusInto(savedFedexStatus, `Deleted id ${s.id}.`, 'ok');
           renderSavedFedex();
+          await deleteLinkedByDedup('rows', s.dedupKey);
         } catch (err) {
           setStatusInto(savedFedexStatus, `Delete failed: ${err.message}`, 'err');
         }
@@ -1318,6 +1320,36 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
     }
   }
 
+  // Cross-delete: FedEx shipments and tracking rows from the same order share a
+  // dedupKey. After deleting one, offer to delete its linked counterpart so we
+  // don't leave orphaned records.
+  async function deleteLinkedByDedup(otherResource, dedupKey) {
+    if (!dedupKey) return 0;
+    const store = makeStore(otherResource);
+    let list;
+    try { list = await store.list(); } catch { return 0; }
+    const matches = (list || []).filter((r) => r.dedupKey && String(r.dedupKey) === String(dedupKey));
+    if (!matches.length) return 0;
+    const name = otherResource === 'fedex' ? 'FedEx shipment' : 'tracking';
+    const ask = typeof window.confirm === 'function'
+      ? window.confirm(`Also delete the linked ${name} record? (keeps FedEx and tracking in sync)`)
+      : true;
+    if (!ask) return 0;
+    for (const m of matches) { try { await store.remove(m.id); } catch {} } // eslint-disable-line no-await-in-loop
+    const ids = new Set(matches.map((m) => String(m.id)));
+    if (otherResource === 'fedex') {
+      savedFedexRows = savedFedexRows.filter((r) => !ids.has(String(r.id)));
+      orders = orders.map((o) => (ids.has(String(o.fedexId)) ? { ...o, fedexId: undefined } : o));
+      renderSavedFedex();
+      renderRows();
+    } else {
+      savedTrackingRows = savedTrackingRows.filter((r) => !ids.has(String(r.id)));
+      trackingRows = trackingRows.map((r) => (ids.has(String(r.id)) ? { ...r, id: undefined } : r));
+      renderAllTracking();
+    }
+    return matches.length;
+  }
+
   // ---- Tracking section ----
 
   function getApiBase() {
@@ -1684,6 +1716,7 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
     savedTrackingRows = savedTrackingRows.filter((r) => r !== row);
     setTrackStatus('Row removed.', 'ok');
     renderAllTracking();
+    await deleteLinkedByDedup('fedex', row.dedupKey);
   }
 
   // Loads saved tracking rows into the "Saved Tracking" tab.
