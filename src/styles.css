@@ -314,6 +314,17 @@ footer {
 .panel.active { display: block; }
 .panel > h2 { margin: 0 0 4px; font-size: 18px; }
 .panel-hint { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+.sub-head { margin: 22px 0 8px; font-size: 14px; color: var(--text); }
+.inline-field { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.inline-field select {
+  background: #0b1224; color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; font-size: 12px; padding: 6px 8px;
+}
+.stock-additem input {
+  background: #0b1224; color: var(--text); border: 1px solid var(--border);
+  border-radius: 6px; font-size: 12px; padding: 6px 8px; min-width: 110px;
+}
+.empty-cell { padding: 14px 10px; color: var(--muted); text-align: center; }
 
 /* ---- Merchants tab ---- */
 .merchant-list {

@@ -21,12 +21,16 @@ export const FEDEX_FIELDS = [
 
 export const MERCHANT_FIELDS = ['name'];
 export const PATTERN_FIELDS = ['merchant', 'tokens', 'label'];
+export const STOCKITEM_FIELDS = ['merchant', 'name', 'section', 'country', 'batch', 'expiry', 'opening', 'matchKey'];
+export const STOCKMOVE_FIELDS = ['merchant', 'itemId', 'product', 'qty', 'date', 'country', 'batch', 'section', 'status', 'orderKey', 'note', 'dedupKey'];
 
 const FIELDS_BY_RESOURCE = {
   rows: TRACKING_FIELDS,
   fedex: FEDEX_FIELDS,
   merchants: MERCHANT_FIELDS,
   patterns: PATTERN_FIELDS,
+  stockitems: STOCKITEM_FIELDS,
+  stockmoves: STOCKMOVE_FIELDS,
 };
 
 function pick(row, fields) {

@@ -12,6 +12,7 @@ const MODULE_ORDER = [
   'data/hsCodes.js',
   'data/states.js',
   'data/merchants.js',
+  'data/stock.js',
   'data/midCodes.js',
   'buildRow.js',
   'trackingRow.js',
@@ -33,6 +34,7 @@ const NAMESPACES = {
   'data/hsCodes.js': 'ModHs',
   'data/states.js': 'ModStates',
   'data/merchants.js': 'ModMerchants',
+  'data/stock.js': 'ModStock',
   'data/midCodes.js': 'ModMid',
   'buildRow.js': 'ModBuildRow',
   'trackingRow.js': 'ModTrackingRow',
@@ -54,6 +56,7 @@ const IMPORT_TO_NS = {
   './data/hsCodes.js': 'ModHs',
   './data/states.js': 'ModStates',
   './data/merchants.js': 'ModMerchants',
+  './data/stock.js': 'ModStock',
   './data/midCodes.js': 'ModMid',
   './buildRow.js': 'ModBuildRow',
   './trackingRow.js': 'ModTrackingRow',
@@ -66,6 +69,7 @@ const IMPORT_TO_NS = {
   '../data/hsCodes.js': 'ModHs',
   '../data/states.js': 'ModStates',
   '../data/merchants.js': 'ModMerchants',
+  '../data/stock.js': 'ModStock',
   '../data/midCodes.js': 'ModMid',
   '../buildRow.js': 'ModBuildRow',
   '../excelExporter.js': 'ModExporter',
@@ -193,6 +197,7 @@ ${css}
     <button class="tab active" id="tab-builder" data-panel="panel-builder" type="button">Builder</button>
     <button class="tab" id="tab-fedex" data-panel="panel-fedex" type="button">Saved FedEx</button>
     <button class="tab" id="tab-tracking" data-panel="panel-tracking" type="button">Saved Tracking</button>
+    <button class="tab" id="tab-stock" data-panel="panel-stock" type="button">Stock</button>
     <button class="tab" id="tab-merchants" data-panel="panel-merchants" type="button">Merchants</button>
     <button class="tab tab-gear" id="btn-settings" type="button" title="Sync settings" aria-label="Sync settings">&#9881;</button>
   </nav>
@@ -279,6 +284,45 @@ ${css}
     </div>
     <div id="merchant-status" aria-live="polite"></div>
     <div id="merchant-list" class="merchant-list"></div>
+  </section>
+
+  <section class="panel" id="panel-stock">
+    <h2>Stock</h2>
+    <p class="panel-hint">A controlled stock ledger per merchant. Pull movements from loaded orders as <strong>pending</strong>, map each to a stock item, then <strong>confirm</strong> to apply &mdash; nothing changes your numbers until you confirm. Manage items and export confirmed movements for your sheets.</p>
+    <div class="actions">
+      <label class="inline-field">Merchant
+        <select id="stock-merchant"></select>
+      </label>
+      <button id="btn-stock-refresh" class="primary" type="button">Refresh</button>
+      <button id="btn-stock-from-orders" type="button">Pull loaded orders &rarr; pending</button>
+      <button id="btn-stock-copy-moves" type="button">Copy confirmed movements</button>
+    </div>
+    <div id="stock-status" aria-live="polite"></div>
+
+    <h3 class="sub-head">Pending movements</h3>
+    <div class="scroll-box">
+      <table id="stock-pending-table" class="track-table" aria-label="Pending stock movements">
+        <thead id="stock-pending-head"></thead>
+        <tbody id="stock-pending-body"></tbody>
+      </table>
+    </div>
+
+    <h3 class="sub-head">Stock items &amp; current quantity</h3>
+    <div class="actions stock-additem">
+      <input type="text" id="si-name" placeholder="Item name">
+      <input type="text" id="si-section" placeholder="Section (e.g. MP stock)">
+      <input type="text" id="si-country" placeholder="Country">
+      <input type="text" id="si-batch" placeholder="Batch">
+      <input type="text" id="si-expiry" placeholder="Expiry">
+      <input type="text" id="si-opening" placeholder="Opening qty" inputmode="numeric">
+      <button id="btn-stock-additem" class="primary" type="button">Add item</button>
+    </div>
+    <div class="scroll-box">
+      <table id="stock-items-table" class="track-table" aria-label="Stock items">
+        <thead id="stock-items-head"></thead>
+        <tbody id="stock-items-body"></tbody>
+      </table>
+    </div>
   </section>
 </main>
 <footer>

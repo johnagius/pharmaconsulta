@@ -62,6 +62,37 @@ const RESOURCES = {
       ['label', 'label'],
     ],
   },
+  stockitems: {
+    table: 'stock_items',
+    fields: [
+      ['merchant', 'merchant'],
+      ['name', 'name'],
+      ['section', 'section'],
+      ['country', 'country'],
+      ['batch', 'batch'],
+      ['expiry', 'expiry'],
+      ['opening', 'opening'],
+      ['matchKey', 'match_key'],
+    ],
+  },
+  stockmoves: {
+    table: 'stock_movements',
+    dedup: true,
+    fields: [
+      ['merchant', 'merchant'],
+      ['itemId', 'item_id'],
+      ['product', 'product'],
+      ['qty', 'qty'],
+      ['date', 'date'],
+      ['country', 'country'],
+      ['batch', 'batch'],
+      ['section', 'section'],
+      ['status', 'status'],
+      ['orderKey', 'order_key'],
+      ['note', 'note'],
+      ['dedupKey', 'dedup_key'],
+    ],
+  },
 };
 
 const CORS = {

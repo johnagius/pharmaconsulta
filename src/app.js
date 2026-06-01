@@ -19,6 +19,7 @@ import {
 } from './trackingRow.js';
 import { createStore } from './trackingStore.js';
 import { DEFAULT_MERCHANTS, detectMerchant, learnExample } from './data/merchants.js';
+import { currentStock, suggestItemId, movementDedupKey, movementsToRows, toNum } from './data/stock.js';
 
 export function createApp({ document, window, pdfjsLib, XLSX }) {
   const dropZone = document.getElementById('drop-zone');
@@ -53,6 +54,24 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
   const merchantStatus = document.getElementById('merchant-status');
   const merchantListEl = document.getElementById('merchant-list');
 
+  // Stock tab
+  const stockMerchantSel = document.getElementById('stock-merchant');
+  const stockRefresh = document.getElementById('btn-stock-refresh');
+  const stockFromOrders = document.getElementById('btn-stock-from-orders');
+  const stockCopyMoves = document.getElementById('btn-stock-copy-moves');
+  const stockStatus = document.getElementById('stock-status');
+  const stockPendingHead = document.getElementById('stock-pending-head');
+  const stockPendingBody = document.getElementById('stock-pending-body');
+  const stockItemsHead = document.getElementById('stock-items-head');
+  const stockItemsBody = document.getElementById('stock-items-body');
+  const siName = document.getElementById('si-name');
+  const siSection = document.getElementById('si-section');
+  const siCountry = document.getElementById('si-country');
+  const siBatch = document.getElementById('si-batch');
+  const siExpiry = document.getElementById('si-expiry');
+  const siOpening = document.getElementById('si-opening');
+  const stockAddItem = document.getElementById('btn-stock-additem');
+
   // Tracking section elements
   const trackApiUrl = document.getElementById('track-api-url');
   const trackSaveUrl = document.getElementById('btn-track-save-url');
@@ -81,6 +100,9 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
   let savedFedexRows = [];
   let merchantsList = DEFAULT_MERCHANTS.map((name) => ({ name }));
   let learnedPatterns = [];
+  let stockItems = [];
+  let stockMoves = [];
+  let stockMerchant = '';
 
   renderRows();
 
@@ -537,6 +559,7 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
         // Lazily refresh saved tabs the first time they're opened.
         if (tabs[i][1] === 'panel-fedex' && !savedFedexRows.length) loadSavedFedex();
         if (tabs[i][1] === 'panel-tracking' && !savedTrackingRows.length) loadSavedRows();
+        if (tabs[i][1] === 'panel-stock' && !stockItems.length && !stockMoves.length) loadStock();
       });
     });
   }
@@ -686,6 +709,7 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
     }
     renderMerchants();
     renderRows();
+    renderStock();
   }
 
   async function loadLearnedPatterns() {
@@ -788,6 +812,351 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
     renderMerchants();
   }
 
+  // ---- Stock ----
+  function initStock() {
+    if (stockRefresh) stockRefresh.addEventListener('click', loadStock);
+    if (stockFromOrders) stockFromOrders.addEventListener('click', pullOrdersToPending);
+    if (stockCopyMoves) stockCopyMoves.addEventListener('click', copyConfirmedMoves);
+    if (stockAddItem) stockAddItem.addEventListener('click', addStockItem);
+    if (stockMerchantSel) {
+      stockMerchantSel.addEventListener('change', () => {
+        stockMerchant = stockMerchantSel.value;
+        renderStock();
+      });
+    }
+    renderStock();
+  }
+
+  async function loadStock() {
+    try {
+      setStatusInto(stockStatus, 'Loading stock…');
+      [stockItems, stockMoves] = await Promise.all([
+        makeStore('stockitems').list(),
+        makeStore('stockmoves').list(),
+      ]);
+      setStatusInto(stockStatus, `Loaded ${stockItems.length} item(s), ${stockMoves.length} movement(s).`, 'ok');
+      renderStock();
+    } catch (err) {
+      setStatusInto(stockStatus, `Load failed: ${err.message}`, 'err');
+    }
+  }
+
+  function merchantNames() {
+    return merchantsList.map((m) => m.name).filter(Boolean);
+  }
+
+  function fillMerchantSelect(sel, value) {
+    sel.innerHTML = '';
+    const blank = document.createElement('option');
+    blank.value = '';
+    blank.textContent = '— all merchants —';
+    sel.appendChild(blank);
+    for (const name of merchantNames()) {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      if (name === value) opt.selected = true;
+      sel.appendChild(opt);
+    }
+  }
+
+  // Create pending movements from the orders currently loaded in the Builder.
+  async function pullOrdersToPending() {
+    if (!orders.length) {
+      setStatusInto(stockStatus, 'No orders loaded in the Builder.', 'warn');
+      return;
+    }
+    const store = makeStore('stockmoves');
+    let made = 0;
+    let skippedNoMerchant = 0;
+    const today = toISODate(new Date());
+    for (const o of orders) {
+      if (!o.merchant) { skippedNoMerchant += 1; continue; }
+      const products = resolveProducts(o);
+      for (const p of products) {
+        const dedupKey = movementDedupKey(o.dedupKey, p.label);
+        if (stockMoves.some((m) => m.dedupKey === dedupKey)) continue;
+        const move = {
+          merchant: o.merchant,
+          itemId: suggestItemId(stockItems, o.merchant, p.key) || '',
+          product: p.label,
+          qty: String(-Math.abs(toNum(p.qty) || 1)),
+          date: today,
+          country: '',
+          batch: '',
+          section: '',
+          status: 'pending',
+          orderKey: o.dedupKey || '',
+          note: '',
+          dedupKey,
+        };
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const saved = await store.save(move);
+          saved._matchKey = p.key;
+          // Replace if dedup returned an existing row, else add.
+          const existingIdx = stockMoves.findIndex((m) => String(m.id) === String(saved.id));
+          if (existingIdx >= 0) stockMoves[existingIdx] = saved; else stockMoves.push(saved);
+          made += 1;
+        } catch (err) {
+          setStatusInto(stockStatus, `Save failed: ${err.message}`, 'err');
+        }
+      }
+    }
+    let msg = `Added ${made} pending movement(s).`;
+    if (skippedNoMerchant) msg += ` Skipped ${skippedNoMerchant} order(s) with no merchant set.`;
+    setStatusInto(stockStatus, msg, made ? 'ok' : 'warn');
+    renderStock();
+  }
+
+  function itemsForMerchant(merchant) {
+    return stockItems.filter((i) => !merchant || i.merchant === merchant);
+  }
+
+  async function addStockItem() {
+    const name = (siName && siName.value || '').trim();
+    if (!name) { setStatusInto(stockStatus, 'Item needs a name.', 'warn'); return; }
+    const merchant = stockMerchant || (merchantNames()[0] || '');
+    const item = {
+      merchant,
+      name,
+      section: (siSection && siSection.value || '').trim(),
+      country: (siCountry && siCountry.value || '').trim(),
+      batch: (siBatch && siBatch.value || '').trim(),
+      expiry: (siExpiry && siExpiry.value || '').trim(),
+      opening: String(toNum(siOpening && siOpening.value)),
+      matchKey: '',
+    };
+    try {
+      const saved = await makeStore('stockitems').save(item);
+      stockItems.push(saved);
+      [siName, siSection, siCountry, siBatch, siExpiry, siOpening].forEach((el) => { if (el) el.value = ''; });
+      setStatusInto(stockStatus, `Added item "${name}"${merchant ? ` for ${merchant}` : ''}.`, 'ok');
+      renderStock();
+    } catch (err) {
+      setStatusInto(stockStatus, `Add item failed: ${err.message}`, 'err');
+    }
+  }
+
+  async function saveStockItem(item) {
+    try {
+      await makeStore('stockitems').update(item.id, item);
+      setStatusInto(stockStatus, `Saved item "${item.name}".`, 'ok');
+      renderStock();
+    } catch (err) {
+      setStatusInto(stockStatus, `Save failed: ${err.message}`, 'err');
+    }
+  }
+
+  async function deleteStockItem(item) {
+    try {
+      await makeStore('stockitems').remove(item.id);
+      stockItems = stockItems.filter((i) => i !== item);
+      setStatusInto(stockStatus, `Deleted item "${item.name}".`, 'ok');
+      renderStock();
+    } catch (err) {
+      setStatusInto(stockStatus, `Delete failed: ${err.message}`, 'err');
+    }
+  }
+
+  async function confirmMove(move) {
+    if (!move.itemId) { setStatusInto(stockStatus, 'Assign a stock item before confirming.', 'warn'); return; }
+    move.status = 'confirmed';
+    try {
+      await makeStore('stockmoves').update(move.id, move);
+      setStatusInto(stockStatus, `Confirmed: ${move.qty} of ${move.product}.`, 'ok');
+      renderStock();
+    } catch (err) {
+      move.status = 'pending';
+      setStatusInto(stockStatus, `Confirm failed: ${err.message}`, 'err');
+    }
+  }
+
+  async function deleteMove(move) {
+    try {
+      if (move.id) await makeStore('stockmoves').remove(move.id);
+      stockMoves = stockMoves.filter((m) => m !== move);
+      setStatusInto(stockStatus, 'Movement removed.', 'ok');
+      renderStock();
+    } catch (err) {
+      setStatusInto(stockStatus, `Delete failed: ${err.message}`, 'err');
+    }
+  }
+
+  // When a movement is assigned to an item, teach that item the product key.
+  async function assignMoveItem(move, itemId) {
+    move.itemId = itemId;
+    const item = stockItems.find((i) => String(i.id) === String(itemId));
+    if (item && !item.matchKey && move._matchKey) {
+      item.matchKey = move._matchKey;
+      try { await makeStore('stockitems').update(item.id, item); } catch {}
+    }
+    try { if (move.id) await makeStore('stockmoves').update(move.id, move); } catch {}
+  }
+
+  async function copyConfirmedMoves() {
+    const moves = stockMoves.filter((m) => !stockMerchant || m.merchant === stockMerchant);
+    const rows = movementsToRows(moves, stockItems);
+    if (!rows.length) { setStatusInto(stockStatus, 'No confirmed movements to copy.', 'warn'); return; }
+    const header = ['Date', 'Item', 'Qty', 'Country', 'Batch', 'Section'];
+    const text = [header].concat(rows).map((r) => r.join('\t')).join('\n');
+    try {
+      await window.navigator.clipboard.writeText(text);
+      setStatusInto(stockStatus, `Copied ${rows.length} confirmed movement(s).`, 'ok');
+    } catch {
+      setStatusInto(stockStatus, `Copy unavailable. Rows:\n${text}`, 'warn');
+    }
+  }
+
+  function renderStock() {
+    if (stockMerchantSel) fillMerchantSelect(stockMerchantSel, stockMerchant);
+    renderStockPending();
+    renderStockItems();
+  }
+
+  function makeStockInput(value, onInput, cls = 'w-md') {
+    const el = document.createElement('input');
+    el.type = 'text';
+    el.className = cls;
+    el.value = value == null ? '' : String(value);
+    el.addEventListener('input', () => onInput(el.value));
+    return el;
+  }
+
+  function renderStockPending() {
+    if (!stockPendingHead || !stockPendingBody) return;
+    stockPendingHead.innerHTML = '';
+    const htr = document.createElement('tr');
+    for (const h of ['Date', 'Merchant', 'Product', 'Stock item', 'Qty', 'Country', 'Batch', 'Section', 'Actions']) {
+      const th = document.createElement('th');
+      th.textContent = h;
+      htr.appendChild(th);
+    }
+    stockPendingHead.appendChild(htr);
+
+    stockPendingBody.innerHTML = '';
+    const pending = stockMoves.filter((m) => m.status !== 'confirmed' && (!stockMerchant || m.merchant === stockMerchant));
+    pending.forEach((move) => {
+      const tr = document.createElement('tr');
+      const cell = (node) => { const td = document.createElement('td'); td.appendChild(node); tr.appendChild(td); };
+      const txt = (s) => { const sp = document.createElement('span'); sp.textContent = s == null ? '' : String(s); return sp; };
+
+      cell(makeStockInput(move.date, (v) => { move.date = v; }, 'w-md'));
+      cell(txt(move.merchant));
+      cell(txt(move.product));
+
+      // Stock item dropdown (only this merchant's items).
+      const sel = document.createElement('select');
+      const blank = document.createElement('option');
+      blank.value = '';
+      blank.textContent = '— map to item —';
+      sel.appendChild(blank);
+      for (const it of itemsForMerchant(move.merchant)) {
+        const opt = document.createElement('option');
+        opt.value = it.id;
+        opt.textContent = `${it.name}${it.country ? ` [${it.country}]` : ''}${it.batch ? ` ·${it.batch}` : ''}`;
+        if (String(move.itemId) === String(it.id)) opt.selected = true;
+        sel.appendChild(opt);
+      }
+      sel.addEventListener('change', () => assignMoveItem(move, sel.value));
+      cell(sel);
+
+      cell(makeStockInput(move.qty, (v) => { move.qty = v; }, 'w-sm'));
+      cell(makeStockInput(move.country, (v) => { move.country = v; }, 'w-sm'));
+      cell(makeStockInput(move.batch, (v) => { move.batch = v; }, 'w-sm'));
+      cell(makeStockInput(move.section, (v) => { move.section = v; }, 'w-md'));
+
+      const actTd = document.createElement('td');
+      const act = document.createElement('div');
+      act.className = 'row-actions';
+      const confirmBtn = document.createElement('button');
+      confirmBtn.type = 'button';
+      confirmBtn.className = 'primary';
+      confirmBtn.textContent = 'Confirm';
+      confirmBtn.addEventListener('click', () => confirmMove(move));
+      act.appendChild(confirmBtn);
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'danger';
+      delBtn.textContent = 'Delete';
+      delBtn.addEventListener('click', () => deleteMove(move));
+      act.appendChild(delBtn);
+      actTd.appendChild(act);
+      tr.appendChild(actTd);
+
+      stockPendingBody.appendChild(tr);
+    });
+    if (!pending.length) {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 9;
+      td.className = 'empty-cell';
+      td.textContent = 'No pending movements. Use “Pull loaded orders → pending” from the Builder batch.';
+      tr.appendChild(td);
+      stockPendingBody.appendChild(tr);
+    }
+  }
+
+  function renderStockItems() {
+    if (!stockItemsHead || !stockItemsBody) return;
+    stockItemsHead.innerHTML = '';
+    const htr = document.createElement('tr');
+    for (const h of ['Item', 'Section', 'Country', 'Batch', 'Expiry', 'Opening', 'Current', 'Actions']) {
+      const th = document.createElement('th');
+      th.textContent = h;
+      htr.appendChild(th);
+    }
+    stockItemsHead.appendChild(htr);
+
+    stockItemsBody.innerHTML = '';
+    const items = itemsForMerchant(stockMerchant);
+    items.forEach((item) => {
+      const tr = document.createElement('tr');
+      const cell = (node) => { const td = document.createElement('td'); td.appendChild(node); tr.appendChild(td); };
+      cell(makeStockInput(item.name, (v) => { item.name = v; }, 'w-lg'));
+      cell(makeStockInput(item.section, (v) => { item.section = v; }, 'w-md'));
+      cell(makeStockInput(item.country, (v) => { item.country = v; }, 'w-sm'));
+      cell(makeStockInput(item.batch, (v) => { item.batch = v; }, 'w-sm'));
+      cell(makeStockInput(item.expiry, (v) => { item.expiry = v; }, 'w-sm'));
+      cell(makeStockInput(item.opening, (v) => { item.opening = v; }, 'w-sm'));
+
+      const cur = document.createElement('td');
+      const curN = currentStock(item, stockMoves);
+      cur.innerHTML = `<strong>${curN}</strong>`;
+      if (curN < 0) cur.style.color = 'var(--err)';
+      tr.appendChild(cur);
+
+      const actTd = document.createElement('td');
+      const act = document.createElement('div');
+      act.className = 'row-actions';
+      const saveBtn = document.createElement('button');
+      saveBtn.type = 'button';
+      saveBtn.className = 'primary';
+      saveBtn.textContent = 'Save';
+      saveBtn.addEventListener('click', () => saveStockItem(item));
+      act.appendChild(saveBtn);
+      const delBtn = document.createElement('button');
+      delBtn.type = 'button';
+      delBtn.className = 'danger';
+      delBtn.textContent = 'Delete';
+      delBtn.addEventListener('click', () => deleteStockItem(item));
+      act.appendChild(delBtn);
+      actTd.appendChild(act);
+      tr.appendChild(actTd);
+
+      stockItemsBody.appendChild(tr);
+    });
+    if (!items.length) {
+      const tr = document.createElement('tr');
+      const td = document.createElement('td');
+      td.colSpan = 8;
+      td.className = 'empty-cell';
+      td.textContent = stockMerchant ? `No items for ${stockMerchant} yet — add some above.` : 'Pick a merchant and add items above.';
+      tr.appendChild(td);
+      stockItemsBody.appendChild(tr);
+    }
+  }
+
   // ---- Tracking section ----
 
   function getApiBase() {
@@ -840,7 +1209,7 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
       : (order.productText ? [order.productText] : []);
     return parseProductLines(lines).map((p) => {
       const detected = detectProduct(p.text);
-      return { qty: p.qty, label: detected ? detected.label : p.text, text: p.text };
+      return { qty: p.qty, label: detected ? detected.label : p.text, text: p.text, key: detected ? detected.key : '' };
     });
   }
 
@@ -1181,6 +1550,7 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
     initFedex();
     initTracking();
     initMerchants();
+    initStock();
     // Load merchants + learned patterns from the store (async, non-blocking).
     loadLearnedPatterns().then(loadMerchants).catch(() => {});
   } catch (err) {
