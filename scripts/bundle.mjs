@@ -169,7 +169,7 @@ window.ParserIndex = ParserIndex;
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>PharmaConsulta Batch Upload</title>
+<title>PharmaConsulta — Shipment & Order Management</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%2338bdf8'/%3E%3Ctext x='8' y='12' text-anchor='middle' font-size='10' font-family='sans-serif' fill='%230b1224' font-weight='700'%3EPC%3C/text%3E%3C/svg%3E">
 <style>
@@ -178,8 +178,15 @@ ${css}
 </head>
 <body>
 <header>
-  <h1>PharmaConsulta &mdash; FedEx Batch Builder</h1>
-  <p>Drop PDF orders (single files or whole folders). Review the table, pick products where needed, then download the FedEx batch xlsx.</p>
+  <div class="brand">
+    <div class="brand-mark" aria-hidden="true">PC</div>
+    <div class="brand-text">
+      <h1>PharmaConsulta</h1>
+      <span class="brand-sub">Shipment &amp; Order Management</span>
+    </div>
+    <span class="brand-status">All processing runs in your browser</span>
+  </div>
+  <p class="brand-desc">Import PDF orders from any merchant, auto-build FedEx batch files, manage tracking sheets, and keep every shipment saved and searchable &mdash; one workspace, no spreadsheets to juggle.</p>
 </header>
 <main>
   <nav class="tabs" role="tablist">
