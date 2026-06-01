@@ -42,6 +42,20 @@ describe('PDF parsers', () => {
     expect(detectProduct(o.productText).key).toBe('botox');
   });
 
+  it('captures every product line for a multi-product Activa order', () => {
+    const orders = dispatch(fixture('activa-multi.txt'));
+    expect(orders).toHaveLength(1);
+    const o = orders[0];
+    expect(o.source).toBe('activa');
+    expect(o.productLines).toEqual([
+      '2 x XEO 100IU (ENG)',
+      '1 x BOT 50IU (ENG) *this is the 50IU*',
+    ]);
+    // Each line resolves to a product (XEO -> Xeomin, BOT -> Botox).
+    expect(detectProduct(o.productLines[0]).key).toBe('xeomin');
+    expect(detectProduct(o.productLines[1]).key).toBe('botox');
+  });
+
   it('parses a K2 multi-order PDF text', () => {
     const orders = dispatch(fixture('k2.txt'));
     expect(orders.length).toBeGreaterThanOrEqual(2);

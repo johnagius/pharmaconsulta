@@ -323,7 +323,7 @@ footer {
   </div>
 </main>
 <footer>
-  PharmaConsulta &middot; runs entirely in your browser. Saved tracking rows go only to the database you configure. &middot; build 2026-06-01 09:05 UTC
+  PharmaConsulta &middot; runs entirely in your browser. Saved tracking rows go only to the database you configure. &middot; build 2026-06-01 09:10 UTC
 </footer>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
@@ -1593,6 +1593,7 @@ function createApp({ document, window, pdfjsLib, XLSX }) {
             source: order.source,
             recipient: order.recipient,
             productText: order.productText,
+            productLines: order.productLines || null,
             product: product || null,
             orderId: order.orderId || '',
           });

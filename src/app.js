@@ -135,6 +135,7 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
             source: order.source,
             recipient: order.recipient,
             productText: order.productText,
+            productLines: order.productLines || null,
             product: product || null,
             orderId: order.orderId || '',
           });
