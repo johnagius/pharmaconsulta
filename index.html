@@ -112,15 +112,26 @@ thead th {
   font-size: 11px;
   line-height: 1.25;
 }
-/* FedEx preview: 55 columns can't fit the viewport, so keep it readable and
-   let this one table scroll sideways (the tracking sheet below fits fully). */
+/* FedEx preview: 55 columns can't all fit the viewport, so keep columns
+   compact — headers wrap onto multiple lines at word boundaries (clean,
+   stacked words, never letter-by-letter), data stays single-line with an
+   ellipsis. The table scrolls sideways for the overflow. */
 #preview-wrapper table { width: max-content; table-layout: auto; }
-#preview-wrapper thead th { white-space: nowrap; }
+#preview-wrapper thead th {
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: break-word;
+  hyphens: none;
+  min-width: 62px;
+  max-width: 96px;
+  vertical-align: bottom;
+}
 #preview-wrapper tbody td {
   padding: 4px 8px;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
-  max-width: 260px;
+  min-width: 62px;
+  max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
 }
@@ -299,7 +310,7 @@ footer {
   </div>
 </main>
 <footer>
-  PharmaConsulta &middot; runs entirely in your browser. Saved tracking rows go only to the database you configure. &middot; build 2026-06-01 08:58 UTC
+  PharmaConsulta &middot; runs entirely in your browser. Saved tracking rows go only to the database you configure. &middot; build 2026-06-01 09:01 UTC
 </footer>
 <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js" crossorigin="anonymous"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" crossorigin="anonymous"></script>
