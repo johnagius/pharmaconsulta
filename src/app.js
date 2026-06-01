@@ -202,12 +202,17 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
           setStatus(`${file.name}: format not recognised.`, 'err');
           continue;
         }
+        // One order number per PDF: orders in the same file share it; a new
+        // file consumes the next daily number. Assigned lazily so a file whose
+        // orders are all duplicates doesn't burn a number.
+        let fileOrderNumber = null;
         for (const order of parsed) {
           const product = detectProduct(order.productText) || detectProduct(text);
           const md = detectMerchant(text, { source: order.source, learned: learnedPatterns });
           const dedupKey = `${hashText(text)}|${order.orderId || (order.recipient && order.recipient.name) || ''}`;
           // Skip an identical order already loaded this session (no dup cards).
           if (orders.some((o) => o.dedupKey === dedupKey)) { skipped += 1; continue; }
+          if (!fileOrderNumber) fileOrderNumber = orderNumberFor(today, nextOrderSeq(dateCompact(today)));
           orders.push({
             fileName: file.name,
             source: order.source,
@@ -218,8 +223,7 @@ export function createApp({ document, window, pdfjsLib, XLSX }) {
             orderId: order.orderId || '',
             text,
             dedupKey,
-            // Unique daily order number assigned once per order (per PDF/order).
-            orderNumber: orderNumberFor(today, nextOrderSeq(dateCompact(today))),
+            orderNumber: fileOrderNumber,
             merchant: md ? md.merchant : '',
             merchantVia: md ? md.via : '',
           });
